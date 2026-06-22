@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.1] - 2026-06-22
+
+### Fixed
+- Easier dragging on mobile: touch is captured only by generous zones around the
+  start-edge, end-edge and centre handles (not the whole ring). After grabbing a
+  handle the drag continues anywhere, while empty space around the dial scrolls
+  the page.
+
 ## [1.4.0] - 2026-06-22
 
 ### Added
@@ -85,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Optional preset row (45 / 90 / 180 / 350°).
 - Visual UI editor with entity pickers; HACS dashboard packaging.
 
+[1.4.1]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.1
 [1.4.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.0
 [1.4.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.0
 [1.3.1]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.3.1

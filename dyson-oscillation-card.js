@@ -12,12 +12,11 @@
  * are dragged *relatively*, so they pin to 0°/350° and never hop across the gap.
  */
 
-const VERSION = "1.4.0";
+const VERSION = "1.4.1";
 
 /* ---------- geometry ---------------------------------------------------- */
 const VB = 400, CX = 200, CY = 200;
 const R_ARC = 150, R_FILL = 150, R_TICK_OUT = 176, R_TICK_IN = 138;
-const HIT_W = 92;
 const DEG2RAD = Math.PI / 180;
 const screenDeg = (d) => d - 85;
 const polar = (d, r) => { const a = screenDeg(d) * DEG2RAD; return { x: CX + r * Math.cos(a), y: CY + r * Math.sin(a) }; };
@@ -259,7 +258,7 @@ class DysonOscillationCard extends HTMLElement {
         .readout b { color:var(--primary-text-color); font-weight:600; }
         .stage { width:100%; max-width:380px; margin:0 auto; }
         svg { width:100%; height:auto; display:block; pointer-events:none; touch-action:auto; }
-        #hitring { pointer-events:stroke; touch-action:none; cursor:grab; }
+        #hitlayer circle { fill:transparent; pointer-events:all; touch-action:none; cursor:grab; }
         .tick { stroke:var(--divider-color,#444); stroke-width:2.4; stroke-linecap:round; }
         .tick.on { stroke:var(--acc); }
         .wedge { fill:var(--acc-soft); }
@@ -279,7 +278,7 @@ class DysonOscillationCard extends HTMLElement {
         .preset:hover { border-color:var(--acc); }
         .preset.sel { background:var(--acc); border-color:var(--acc); color:#fff; }
         .off { opacity:.45; }
-        #hitring.off { pointer-events:none; }
+        #hitlayer.off circle { pointer-events:none; }
         .controls { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px; }
         .chip { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
           padding:9px 3px; border-radius:14px; background:var(--chip-bg);
@@ -306,7 +305,11 @@ class DysonOscillationCard extends HTMLElement {
         <div class="head"><span class="title"></span><span class="readout"></span></div>
         <div class="stage"><svg viewBox="0 0 ${VB} ${VB}" id="svg">
           <g id="content"></g>
-          <circle id="hitring" cx="${CX}" cy="${CY}" r="${R_ARC}" fill="none" stroke="transparent" stroke-width="${HIT_W}"/>
+          <g id="hitlayer">
+            <circle id="hit-low" r="48"/>
+            <circle id="hit-high" r="48"/>
+            <circle id="hit-center" r="54"/>
+          </g>
         </svg></div>
         <div class="hint"></div>
         <div class="presets"></div>
@@ -314,7 +317,12 @@ class DysonOscillationCard extends HTMLElement {
       </ha-card>`;
     this._svg = this.shadowRoot.getElementById("svg");
     this._content = this.shadowRoot.getElementById("content");
-    this._hitring = this.shadowRoot.getElementById("hitring");
+    this._hitLayer = this.shadowRoot.getElementById("hitlayer");
+    this._hitEls = {
+      low: this.shadowRoot.getElementById("hit-low"),
+      high: this.shadowRoot.getElementById("hit-high"),
+      center: this.shadowRoot.getElementById("hit-center"),
+    };
     this._headEl = this.shadowRoot.querySelector(".head");
     this._titleEl = this.shadowRoot.querySelector(".title");
     this._readoutEl = this.shadowRoot.querySelector(".readout");
@@ -322,10 +330,13 @@ class DysonOscillationCard extends HTMLElement {
     this._presetsEl = this.shadowRoot.querySelector(".presets");
     this._controlsEl = this.shadowRoot.querySelector(".controls");
     this._ctrlSig = "";
-    this._hitring.addEventListener("pointerdown", (e) => this._onDown(e));
-    this._hitring.addEventListener("pointermove", (e) => this._onMove(e));
-    this._hitring.addEventListener("pointerup", (e) => this._onUp(e));
-    this._hitring.addEventListener("pointercancel", (e) => this._onUp(e));
+    // Only the three handle zones grab; everything else lets the page scroll.
+    for (const el of Object.values(this._hitEls)) {
+      el.addEventListener("pointerdown", (e) => this._onDown(e));
+      el.addEventListener("pointermove", (e) => this._onMove(e));
+      el.addEventListener("pointerup", (e) => this._onUp(e));
+      el.addEventListener("pointercancel", (e) => this._onUp(e));
+    }
   }
 
   /* ---- coordinate helpers ---- */
@@ -339,7 +350,7 @@ class DysonOscillationCard extends HTMLElement {
     const sx = ((clientX - r.left) / r.width) * VB, sy = ((clientY - r.top) / r.height) * VB;
     const dist = (d) => { const p = polar(d, R_ARC); return Math.hypot(p.x - sx, p.y - sy); };
     const c = [["center", dist(this._center)], ["low", dist(this._low)], ["high", dist(this._high)]].sort((a, b) => a[1] - b[1]);
-    return c[0][1] < 45 ? c[0][0] : "center";
+    return c[0][0];
   }
 
   /* ---- relative drag ---- */
@@ -354,7 +365,9 @@ class DysonOscillationCard extends HTMLElement {
     }
     e.preventDefault();
     this._dragging = handle;
-    this._hitring.setPointerCapture(e.pointerId);
+    this._capEl = this._hitEls[handle];
+    // capture on the (persistent) grab zone so the drag survives off-ring and re-renders
+    try { this._capEl.setPointerCapture(e.pointerId); } catch (_) {}
     this._dragPrevAngle = this._screenAngle(e.clientX, e.clientY);
     this._dragValue = handle === "low" ? this._low : handle === "high" ? this._high : this._center;
     this._hapticValue = this._dragValue;
@@ -386,8 +399,8 @@ class DysonOscillationCard extends HTMLElement {
 
   _onUp(e) {
     if (!this._dragging) return;
-    try { this._hitring.releasePointerCapture(e.pointerId); } catch (_) {}
-    this._dragging = null;
+    try { (this._capEl || this._hitEls[this._dragging]).releasePointerCapture(e.pointerId); } catch (_) {}
+    this._dragging = null; this._capEl = null;
     if (this._config.haptics) haptic("light");
     this._flush(); this._render();
   }
@@ -488,7 +501,13 @@ class DysonOscillationCard extends HTMLElement {
       <text class="hlabel" x="${cp.x.toFixed(1)}" y="${cp.y.toFixed(1)}">${Math.round(c)}</text>`;
     this._content.innerHTML = ticks + wedge + aim + this._fanGlyph() + edge + handles;
     this._content.classList.toggle("off", !this._available);
-    this._hitring.classList.toggle("off", !this._available);
+    // keep the (persistent) grab zones on top of the handles, unless dragging
+    if (!this._dragging) {
+      this._hitEls.low.setAttribute("cx", lp.x.toFixed(1)); this._hitEls.low.setAttribute("cy", lp.y.toFixed(1));
+      this._hitEls.high.setAttribute("cx", hp.x.toFixed(1)); this._hitEls.high.setAttribute("cy", hp.y.toFixed(1));
+      this._hitEls.center.setAttribute("cx", cp.x.toFixed(1)); this._hitEls.center.setAttribute("cy", cp.y.toFixed(1));
+    }
+    this._hitLayer.classList.toggle("off", !this._available);
 
     this._renderPresets(span);
     this._renderControls();
