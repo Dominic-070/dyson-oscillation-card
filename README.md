@@ -8,7 +8,6 @@ picking a fixed preset width. Plus an optional **Mushroom-style control row**
 
 <img width="460" height="720" alt="image" src="https://github.com/user-attachments/assets/1ae5f882-853c-48fb-bfe0-7d8abbe91aeb" />
 
-
 Built for the [`cmgrayb/hass-dyson`](https://github.com/cmgrayb/hass-dyson)
 integration. No build step, no dependencies — a single JS file.
 
@@ -26,6 +25,12 @@ integration. No build step, no dependencies — a single JS file.
   is preserved (falls back to the span number).
 - Every extra control **auto-hides if your model doesn't expose that entity**, so
   the same card works across the Dyson line-up (Cool, Hot+Cool, Pure, etc.).
+- **Multilingual** UI (en/nl/de/fr/es) following the Home Assistant language.
+- Switchable **centre icon**: `tower` (default) or `oval`.
+- **Multi-language** UI (follows Home Assistant's language): English, Dutch,
+  German, French, Spanish — falls back to English.
+- **Two centre-icon styles**: `tower` (elongated Air Multiplier, the default — e.g.
+  Purifier Cool PC1, AM07, PC3) or `oval` (round-loop fans like the Cool CF1).
 - Full **UI editor** — no YAML required.
 
 > Angles run **0–350°**. 175° points forward (toward you, bottom of the dial).
@@ -107,6 +112,7 @@ features:
 | `haptics` | — | `true` | Haptic feedback on phone (Companion app) |
 | `animate_fan` | — | `true` | Spin the speed slider's fan icon with the speed |
 | `min_span` | — | `35` | Width restored by a double-tap on the centre |
+| `fan_icon` | — | `tower` | Centre icon: `tower` (upright) or `oval` (round fan) |
 | `features` | — | power, oscillation, night_mode, auto, speed | Control buttons to show, in order |
 
 Available `features`: `power`, `oscillation`, `night_mode`, `auto`,

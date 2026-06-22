@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-06-22
+
+### Added
+- Multilingual UI (title, read-out, hint, control labels and editor) following
+  the Home Assistant language: English, Dutch, German, French, Spanish, with
+  English fallback.
+- Switchable centre icon via `fan_icon`: `tower` (default — upright tower fan
+  with round base and elongated Air Multiplier loop) or `oval` (the previous
+  round loop, for desk fans like the Cool CF1).
+
+## [1.4.0] - 2026-06-22
+
+### Added
+- Multi-language UI following Home Assistant's language (English, Dutch, German,
+  French, Spanish; English fallback). All card-facing text is localised.
+- `fan_icon` option for the centre glyph: `tower` (elongated Air Multiplier on a
+  round base, new default) or `oval` (the original round-loop fan).
+
 ## [1.3.1] - 2026-06-22
 
 ### Fixed
@@ -67,6 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Optional preset row (45 / 90 / 180 / 350°).
 - Visual UI editor with entity pickers; HACS dashboard packaging.
 
+[1.4.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.0
+[1.4.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.0
 [1.3.1]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.3.1
 [1.3.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.3.0
 [1.1.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.1.0

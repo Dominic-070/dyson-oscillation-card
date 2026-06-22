@@ -5,25 +5,128 @@
  * that side, plus an optional Mushroom-style control row.
  *
  * For the hass-dyson integration (cmgrayb/hass-dyson). No build step, no deps.
+ * Multilingual (en/nl/de/fr/es), follows the Home Assistant UI language.
  *
  * Angles run 0–350°. 175° points forward (toward you, bottom of the dial).
  * The 10° dead-zone (350°→0°) sits at the top — the back of the fan. Handles
  * are dragged *relatively*, so they pin to 0°/350° and never hop across the gap.
  */
 
-const VERSION = "1.3.1";
+const VERSION = "1.4.0";
 
 /* ---------- geometry ---------------------------------------------------- */
 const VB = 400, CX = 200, CY = 200;
 const R_ARC = 150, R_FILL = 150, R_TICK_OUT = 176, R_TICK_IN = 138;
-const HIT_W = 92;                 // width of the touch band around the ring
+const HIT_W = 92;
 const DEG2RAD = Math.PI / 180;
 const screenDeg = (d) => d - 85;
-const polar = (d, r) => {
-  const a = screenDeg(d) * DEG2RAD;
-  return { x: CX + r * Math.cos(a), y: CY + r * Math.sin(a) };
-};
+const polar = (d, r) => { const a = screenDeg(d) * DEG2RAD; return { x: CX + r * Math.cos(a), y: CY + r * Math.sin(a) }; };
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+/* ---------- i18n -------------------------------------------------------- */
+const LANG = {
+  en: {
+    title: "Oscillation", dir: "direction", width: "width", off: "Off",
+    hint: "Drag the centre to aim · drag an edge to adjust that side",
+    c_power: "Power", c_oscillation: "Oscillation", c_night: "Night", c_auto: "Auto",
+    c_monitor: "Monitor", c_speed: "Speed", c_timer: "Timer", c_air: "Air", c_filter: "Filter",
+    e_name: "Title (optional)",
+    e_center: "Direction / centre angle (required)",
+    e_low: "Low angle — start edge (required)", e_high: "High angle — end edge (required)",
+    e_span: "Width (optional, for presets + restore)",
+    e_show_title: "Show title", e_show_state: "Show angle read-out (direction/width)",
+    e_show_hint: "Show instruction text", e_show_presets: "Show preset buttons",
+    e_haptics: "Haptic feedback (phone)", e_animate: "Animate fan icon with speed",
+    e_minspan: "Min. width on double-tap (°)", e_fanicon: "Centre icon style",
+    e_features: "Control buttons (Mushroom style)",
+    o_power: "Power", o_oscillation: "Oscillation on/off", o_night: "Night mode", o_auto: "Auto mode",
+    o_monitor: "Continuous monitoring", o_speed: "Speed (slider)", o_timer: "Sleep timer",
+    o_air: "Air quality", o_filter: "Filter life",
+    i_tower: "Tower (elongated)", i_oval: "Oval (round fan)",
+  },
+  nl: {
+    title: "Oscillatie", dir: "richting", width: "breedte", off: "Uit",
+    hint: "Sleep het midden om te richten · sleep een rand om die kant bij te stellen",
+    c_power: "Aan/uit", c_oscillation: "Oscillatie", c_night: "Nacht", c_auto: "Auto",
+    c_monitor: "Monitor", c_speed: "Snelheid", c_timer: "Timer", c_air: "Lucht", c_filter: "Filter",
+    e_name: "Titel (optioneel)",
+    e_center: "Richting / center-hoek (vereist)",
+    e_low: "Lage hoek — startrand (vereist)", e_high: "Hoge hoek — eindrand (vereist)",
+    e_span: "Spanwijdte (optioneel, voor presets + herstel)",
+    e_show_title: "Toon titel", e_show_state: "Toon hoek-waarden (richting/breedte)",
+    e_show_hint: "Toon instructietekst", e_show_presets: "Toon preset-knoppen",
+    e_haptics: "Haptische feedback (telefoon)", e_animate: "Animeer fan-icoon op snelheid",
+    e_minspan: "Min. breedte bij dubbeltik (°)", e_fanicon: "Stijl van het middenicoon",
+    e_features: "Bedieningsknoppen (Mushroom-stijl)",
+    o_power: "Aan/uit", o_oscillation: "Oscillatie aan/uit", o_night: "Nachtstand", o_auto: "Auto-modus",
+    o_monitor: "Continue monitoring", o_speed: "Snelheid (slider)", o_timer: "Slaaptimer",
+    o_air: "Luchtkwaliteit", o_filter: "Filterlevensduur",
+    i_tower: "Toren (langwerpig)", i_oval: "Ovaal (ronde ventilator)",
+  },
+  de: {
+    title: "Oszillation", dir: "Richtung", width: "Breite", off: "Aus",
+    hint: "Mitte ziehen zum Ausrichten · Rand ziehen, um diese Seite anzupassen",
+    c_power: "Ein/Aus", c_oscillation: "Oszillation", c_night: "Nacht", c_auto: "Auto",
+    c_monitor: "Monitor", c_speed: "Geschw.", c_timer: "Timer", c_air: "Luft", c_filter: "Filter",
+    e_name: "Titel (optional)",
+    e_center: "Richtung / Mittelwinkel (erforderlich)",
+    e_low: "Niedriger Winkel — Startkante (erforderlich)", e_high: "Hoher Winkel — Endkante (erforderlich)",
+    e_span: "Breite (optional, für Presets + Wiederherstellung)",
+    e_show_title: "Titel anzeigen", e_show_state: "Winkelanzeige zeigen (Richtung/Breite)",
+    e_show_hint: "Hinweistext anzeigen", e_show_presets: "Preset-Tasten anzeigen",
+    e_haptics: "Haptisches Feedback (Telefon)", e_animate: "Lüftersymbol mit Geschwindigkeit animieren",
+    e_minspan: "Min. Breite bei Doppeltipp (°)", e_fanicon: "Stil des Mittelsymbols",
+    e_features: "Bedientasten (Mushroom-Stil)",
+    o_power: "Ein/Aus", o_oscillation: "Oszillation an/aus", o_night: "Nachtmodus", o_auto: "Auto-Modus",
+    o_monitor: "Dauerüberwachung", o_speed: "Geschwindigkeit (Regler)", o_timer: "Sleep-Timer",
+    o_air: "Luftqualität", o_filter: "Filterlebensdauer",
+    i_tower: "Turm (länglich)", i_oval: "Oval (runder Ventilator)",
+  },
+  fr: {
+    title: "Oscillation", dir: "direction", width: "largeur", off: "Arrêt",
+    hint: "Faites glisser le centre pour orienter · un bord pour ajuster ce côté",
+    c_power: "Marche", c_oscillation: "Oscillation", c_night: "Nuit", c_auto: "Auto",
+    c_monitor: "Suivi", c_speed: "Vitesse", c_timer: "Minut.", c_air: "Air", c_filter: "Filtre",
+    e_name: "Titre (optionnel)",
+    e_center: "Direction / angle central (requis)",
+    e_low: "Angle bas — bord de début (requis)", e_high: "Angle haut — bord de fin (requis)",
+    e_span: "Largeur (optionnel, pour préréglages + restauration)",
+    e_show_title: "Afficher le titre", e_show_state: "Afficher l'angle (direction/largeur)",
+    e_show_hint: "Afficher le texte d'aide", e_show_presets: "Afficher les préréglages",
+    e_haptics: "Retour haptique (téléphone)", e_animate: "Animer l'icône du ventilateur selon la vitesse",
+    e_minspan: "Largeur min. au double-tap (°)", e_fanicon: "Style de l'icône centrale",
+    e_features: "Boutons de commande (style Mushroom)",
+    o_power: "Marche/Arrêt", o_oscillation: "Oscillation on/off", o_night: "Mode nuit", o_auto: "Mode auto",
+    o_monitor: "Surveillance continue", o_speed: "Vitesse (curseur)", o_timer: "Minuterie",
+    o_air: "Qualité de l'air", o_filter: "Durée de vie du filtre",
+    i_tower: "Tour (allongée)", i_oval: "Ovale (ventilateur rond)",
+  },
+  es: {
+    title: "Oscilación", dir: "dirección", width: "anchura", off: "Apagado",
+    hint: "Arrastra el centro para orientar · arrastra un borde para ajustar ese lado",
+    c_power: "Encendido", c_oscillation: "Oscilación", c_night: "Noche", c_auto: "Auto",
+    c_monitor: "Monitor", c_speed: "Velocidad", c_timer: "Temporiz.", c_air: "Aire", c_filter: "Filtro",
+    e_name: "Título (opcional)",
+    e_center: "Dirección / ángulo central (obligatorio)",
+    e_low: "Ángulo bajo — borde inicial (obligatorio)", e_high: "Ángulo alto — borde final (obligatorio)",
+    e_span: "Anchura (opcional, para preajustes + restaurar)",
+    e_show_title: "Mostrar título", e_show_state: "Mostrar ángulos (dirección/anchura)",
+    e_show_hint: "Mostrar texto de ayuda", e_show_presets: "Mostrar botones de preajuste",
+    e_haptics: "Respuesta háptica (teléfono)", e_animate: "Animar el icono del ventilador con la velocidad",
+    e_minspan: "Anchura mín. al doble toque (°)", e_fanicon: "Estilo del icono central",
+    e_features: "Botones de control (estilo Mushroom)",
+    o_power: "Encendido/Apagado", o_oscillation: "Oscilación on/off", o_night: "Modo noche", o_auto: "Modo auto",
+    o_monitor: "Monitoreo continuo", o_speed: "Velocidad (deslizador)", o_timer: "Temporizador",
+    o_air: "Calidad del aire", o_filter: "Vida del filtro",
+    i_tower: "Torre (alargada)", i_oval: "Óvalo (ventilador redondo)",
+  },
+};
+const langOf = (hass) => {
+  const raw = (hass && (hass.locale && hass.locale.language || hass.language)) || "en";
+  const l = String(raw).split("-")[0].toLowerCase();
+  return LANG[l] ? l : "en";
+};
+const tr = (lang, key) => (LANG[lang] && LANG[lang][key]) || LANG.en[key] || key;
 
 /* ---------- helpers ----------------------------------------------------- */
 function fireEvent(node, type, detail) {
@@ -33,7 +136,7 @@ function fireEvent(node, type, detail) {
   return ev;
 }
 let _lastHaptic = 0;
-function haptic(type, minGap = 0) {                 // Companion-app haptics; no-op on desktop
+function haptic(type, minGap = 0) {
   const now = Date.now();
   if (now - _lastHaptic < minGap) return;
   _lastHaptic = now;
@@ -42,48 +145,30 @@ function haptic(type, minGap = 0) {                 // Companion-app haptics; no
 
 /* ---------- Mushroom-style control catalogue ---------------------------- */
 const CONTROLS = {
-  power: {
-    label: "Aan/uit", icon: "mdi:power", kind: "toggle",
+  power: { lkey: "c_power", okey: "o_power", icon: "mdi:power", kind: "toggle",
     entity: (m) => m.fan, active: (s) => s && s.state === "on",
-    tap: (hass, id) => hass.callService("homeassistant", "toggle", { entity_id: id }),
-  },
-  oscillation: {
-    label: "Oscillatie", icon: "mdi:arrow-left-right", kind: "toggle",
+    tap: (hass, id) => hass.callService("homeassistant", "toggle", { entity_id: id }) },
+  oscillation: { lkey: "c_oscillation", okey: "o_oscillation", icon: "mdi:arrow-left-right", kind: "toggle",
     entity: (m) => m.fan, active: (s) => !!(s && s.attributes && s.attributes.oscillating),
-    tap: (hass, id, s) => hass.callService("fan", "oscillate", {
-      entity_id: id, oscillating: !(s && s.attributes && s.attributes.oscillating) }),
-  },
-  night_mode: {
-    label: "Nacht", icon: "mdi:weather-night", kind: "toggle",
+    tap: (hass, id, s) => hass.callService("fan", "oscillate", { entity_id: id, oscillating: !(s && s.attributes && s.attributes.oscillating) }) },
+  night_mode: { lkey: "c_night", okey: "o_night", icon: "mdi:weather-night", kind: "toggle",
     entity: (m) => m.night_mode, active: (s) => s && s.state === "on",
-    tap: (hass, id) => hass.callService("homeassistant", "toggle", { entity_id: id }),
-  },
-  auto: {
-    label: "Auto", icon: "mdi:fan-auto", kind: "toggle",
+    tap: (hass, id) => hass.callService("homeassistant", "toggle", { entity_id: id }) },
+  auto: { lkey: "c_auto", okey: "o_auto", icon: "mdi:fan-auto", kind: "toggle",
     entity: (m) => m.fan, active: (s) => !!(s && s.attributes && s.attributes.preset_mode === "auto"),
-    tap: (hass, id, s) => hass.callService("fan", "set_preset_mode", {
-      entity_id: id, preset_mode: s && s.attributes && s.attributes.preset_mode === "auto" ? "manual" : "auto" }),
-  },
-  continuous_monitoring: {
-    label: "Monitor", icon: "mdi:eye", kind: "toggle",
+    tap: (hass, id, s) => hass.callService("fan", "set_preset_mode", { entity_id: id, preset_mode: s && s.attributes && s.attributes.preset_mode === "auto" ? "manual" : "auto" }) },
+  continuous_monitoring: { lkey: "c_monitor", okey: "o_monitor", icon: "mdi:eye", kind: "toggle",
     entity: (m) => m.continuous_monitoring, active: (s) => s && s.state === "on",
-    tap: (hass, id) => hass.callService("homeassistant", "toggle", { entity_id: id }),
-  },
-  speed: { label: "Snelheid", icon: "mdi:fan", kind: "slider", entity: (m) => m.fan },
-  sleep_timer: {
-    label: "Timer", icon: "mdi:timer-outline", kind: "badge",
+    tap: (hass, id) => hass.callService("homeassistant", "toggle", { entity_id: id }) },
+  speed: { lkey: "c_speed", okey: "o_speed", icon: "mdi:fan", kind: "slider", entity: (m) => m.fan },
+  sleep_timer: { lkey: "c_timer", okey: "o_timer", icon: "mdi:timer-outline", kind: "badge",
     entity: (m) => m.sleep_timer,
-    text: (s) => { const v = parseFloat(s.state); return Number.isFinite(v) && v > 0 ? `${Math.round(v)}m` : "Uit"; },
-  },
-  air_quality: {
-    label: "Lucht", icon: "mdi:air-filter", kind: "badge",
-    entity: (m) => m.air_quality, text: (s) => s.state,
-  },
-  filter_life: {
-    label: "Filter", icon: "mdi:air-purifier", kind: "badge",
+    text: (s, t) => { const v = parseFloat(s.state); return Number.isFinite(v) && v > 0 ? `${Math.round(v)}m` : t("off"); } },
+  air_quality: { lkey: "c_air", okey: "o_air", icon: "mdi:air-filter", kind: "badge",
+    entity: (m) => m.air_quality, text: (s) => s.state },
+  filter_life: { lkey: "c_filter", okey: "o_filter", icon: "mdi:air-purifier", kind: "badge",
     entity: (m) => m.filter_life,
-    text: (s) => { const v = parseFloat(s.state); return Number.isFinite(v) ? `${Math.round(v)}%` : s.state; },
-  },
+    text: (s) => { const v = parseFloat(s.state); return Number.isFinite(v) ? `${Math.round(v)}%` : s.state; } },
 };
 const DEFAULT_FEATURES = ["power", "oscillation", "night_mode", "auto", "speed"];
 
@@ -95,20 +180,20 @@ class DysonOscillationCard extends HTMLElement {
     this._dragging = null;
     this._center = 175; this._low = 0; this._high = 350;
     this._pending = {}; this._lastSend = 0; this._sendTimer = null;
-    this._sliderDrag = false;
+    this._sliderDrag = false; this._lang = "en";
   }
 
+  _t(key) { return tr(this._lang, key); }
+
   static getStubConfig(hass) {
-    const find = (suffix) => Object.keys(hass.states).find(
-      (e) => e.startsWith("number.") && e.endsWith(suffix));
+    const find = (suffix) => Object.keys(hass.states).find((e) => e.startsWith("number.") && e.endsWith(suffix));
     return {
       type: "custom:dyson-oscillation-card",
       center_angle_entity: find("_oscillation_center_angle") || "",
       low_angle_entity: find("_oscillation_low_angle") || "",
       high_angle_entity: find("_oscillation_high_angle") || "",
       span_entity: find("_oscillation_angle_span") || find("_oscillation_angle") || "",
-      show_presets: true,
-      features: [...DEFAULT_FEATURES],
+      show_presets: true, features: [...DEFAULT_FEATURES],
     };
   }
 
@@ -116,10 +201,10 @@ class DysonOscillationCard extends HTMLElement {
 
   setConfig(config) {
     if (!config.center_angle_entity || !config.low_angle_entity || !config.high_angle_entity)
-      throw new Error("Stel center_angle_entity, low_angle_entity en high_angle_entity in.");
+      throw new Error("Set center_angle_entity, low_angle_entity and high_angle_entity.");
     this._config = {
       show_presets: true, show_hint: true, show_title: true, show_state: true,
-      haptics: true, animate_fan: true, min_span: 35,
+      haptics: true, animate_fan: true, min_span: 35, fan_icon: "tower",
       presets: [45, 90, 180, 350], features: [...DEFAULT_FEATURES],
       ...config,
     };
@@ -145,6 +230,7 @@ class DysonOscillationCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    this._lang = langOf(hass);
     if (!this._built) this._build();
     if (this._dragging || this._sliderDrag) return;
     const num = (id, fb) => { const s = hass.states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : fb; };
@@ -157,7 +243,6 @@ class DysonOscillationCard extends HTMLElement {
     this._render();
   }
 
-  /* ---- scaffold ---- */
   _build() {
     this._built = true;
     this.shadowRoot.innerHTML = `
@@ -173,7 +258,6 @@ class DysonOscillationCard extends HTMLElement {
         .readout { font-variant-numeric:tabular-nums; font-size:.82rem; color:var(--secondary-text-color); }
         .readout b { color:var(--primary-text-color); font-weight:600; }
         .stage { width:100%; max-width:380px; margin:0 auto; }
-        /* svg ignores pointers except on the hit-ring, so empty corners scroll */
         svg { width:100%; height:auto; display:block; pointer-events:none; touch-action:auto; }
         #hitring { pointer-events:stroke; touch-action:none; cursor:grab; }
         .tick { stroke:var(--divider-color,#444); stroke-width:2.4; stroke-linecap:round; }
@@ -196,8 +280,6 @@ class DysonOscillationCard extends HTMLElement {
         .preset.sel { background:var(--acc); border-color:var(--acc); color:#fff; }
         .off { opacity:.45; }
         #hitring.off { pointer-events:none; }
-
-        /* 4-up grid so the chips stay narrow on mobile */
         .controls { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px; }
         .chip { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
           padding:9px 3px; border-radius:14px; background:var(--chip-bg);
@@ -209,7 +291,6 @@ class DysonOscillationCard extends HTMLElement {
         .chip.on { background:var(--acc); border-color:var(--acc); }
         .chip.on ha-icon, .chip.on .clabel { color:#fff; }
         .chip.badge .cval { font-size:.8rem; font-weight:600; color:var(--primary-text-color); }
-
         .slider { grid-column:1 / -1; display:flex; align-items:center; gap:12px; padding:10px 14px;
           border-radius:18px; background:var(--chip-bg); border:1px solid var(--divider-color,#333); }
         .slider ha-icon { --mdc-icon-size:24px; color:var(--primary-text-color); flex:0 0 auto; transform-origin:50% 50%; }
@@ -240,7 +321,7 @@ class DysonOscillationCard extends HTMLElement {
     this._hintEl = this.shadowRoot.querySelector(".hint");
     this._presetsEl = this.shadowRoot.querySelector(".presets");
     this._controlsEl = this.shadowRoot.querySelector(".controls");
-    this._ctrlSig = "";                       // force controls to (re)build
+    this._ctrlSig = "";
     this._hitring.addEventListener("pointerdown", (e) => this._onDown(e));
     this._hitring.addEventListener("pointermove", (e) => this._onMove(e));
     this._hitring.addEventListener("pointerup", (e) => this._onUp(e));
@@ -250,32 +331,26 @@ class DysonOscillationCard extends HTMLElement {
   /* ---- coordinate helpers ---- */
   _screenAngle(clientX, clientY) {
     const r = this._svg.getBoundingClientRect();
-    const sx = ((clientX - r.left) / r.width) * VB;
-    const sy = ((clientY - r.top) / r.height) * VB;
+    const sx = ((clientX - r.left) / r.width) * VB, sy = ((clientY - r.top) / r.height) * VB;
     return Math.atan2(sy - CY, sx - CX) / DEG2RAD;
   }
   _pickHandle(clientX, clientY) {
     const r = this._svg.getBoundingClientRect();
-    const sx = ((clientX - r.left) / r.width) * VB;
-    const sy = ((clientY - r.top) / r.height) * VB;
+    const sx = ((clientX - r.left) / r.width) * VB, sy = ((clientY - r.top) / r.height) * VB;
     const dist = (d) => { const p = polar(d, R_ARC); return Math.hypot(p.x - sx, p.y - sy); };
-    const c = [["center", dist(this._center)], ["low", dist(this._low)], ["high", dist(this._high)]]
-      .sort((a, b) => a[1] - b[1]);
+    const c = [["center", dist(this._center)], ["low", dist(this._low)], ["high", dist(this._high)]].sort((a, b) => a[1] - b[1]);
     return c[0][1] < 45 ? c[0][0] : "center";
   }
 
-  /* ---- relative drag (no absolute-angle teleport across the rear gap) ---- */
+  /* ---- relative drag ---- */
   _onDown(e) {
     if (!this._available) return;
     const handle = this._pickHandle(e.clientX, e.clientY);
     const now = Date.now();
     const dbl = handle === "center" && now - (this._lastTap || 0) < 320;
     this._lastTap = now;
-    // double-tap the collapsed point to recover a usable width
     if (dbl && (this._high - this._low) < (this._config.min_span || 35)) {
-      e.preventDefault();
-      this._restoreSpan(this._config.min_span || 35);
-      return;
+      e.preventDefault(); this._restoreSpan(this._config.min_span || 35); return;
     }
     e.preventDefault();
     this._dragging = handle;
@@ -290,7 +365,7 @@ class DysonOscillationCard extends HTMLElement {
     if (!this._dragging) return;
     e.preventDefault();
     const a = this._screenAngle(e.clientX, e.clientY);
-    const delta = ((a - this._dragPrevAngle + 540) % 360) - 180;  // shortest signed step
+    const delta = ((a - this._dragPrevAngle + 540) % 360) - 180;
     this._dragPrevAngle = a;
     let lo, hi;
     if (this._dragging === "low") { lo = 0; hi = this._high; }
@@ -298,16 +373,13 @@ class DysonOscillationCard extends HTMLElement {
     else { const half = Math.floor((this._high - this._low) / 2); lo = half; hi = 350 - half; }
     const v = clamp(this._dragValue + delta, lo, hi);
     this._dragValue = v;
-
     if (this._dragging === "low") {
       this._low = Math.round(v); this._center = (this._low + this._high) / 2;
       this._queue(this._config.low_angle_entity, this._low);
     } else if (this._dragging === "high") {
       this._high = Math.round(v); this._center = (this._low + this._high) / 2;
       this._queue(this._config.high_angle_entity, this._high);
-    } else {
-      this._applyCenter(Math.round(v));
-    }
+    } else { this._applyCenter(Math.round(v)); }
     if (this._config.haptics && Math.abs(v - this._hapticValue) >= 4) { haptic("selection", 30); this._hapticValue = v; }
     this._render();
   }
@@ -317,8 +389,7 @@ class DysonOscillationCard extends HTMLElement {
     try { this._hitring.releasePointerCapture(e.pointerId); } catch (_) {}
     this._dragging = null;
     if (this._config.haptics) haptic("light");
-    this._flush();
-    this._render();
+    this._flush(); this._render();
   }
 
   _applyCenter(c) {
@@ -346,7 +417,6 @@ class DysonOscillationCard extends HTMLElement {
     this._render();
   }
 
-  /* ---- throttled writes ---- */
   _queue(entity, value) {
     if (!entity) return;
     this._pending[entity] = Math.round(value);
@@ -359,19 +429,14 @@ class DysonOscillationCard extends HTMLElement {
     const entries = Object.entries(this._pending); this._pending = {};
     if (!entries.length || !this._hass) return;
     this._lastSend = Date.now();
-    for (const [entity_id, value] of entries)
-      this._hass.callService("number", "set_value", { entity_id, value });
+    for (const [entity_id, value] of entries) this._hass.callService("number", "set_value", { entity_id, value });
   }
 
   _setPreset(deg) {
     if (this._config.haptics) haptic("medium");
     const sel = this._map.oscillation_select;
-    if (sel && this._hass.states[sel]) {
-      this._hass.callService("select", "select_option", { entity_id: sel, option: `${deg}°` }); return;
-    }
-    if (this._config.span_entity && this._hass.states[this._config.span_entity]) {
-      this._hass.callService("number", "set_value", { entity_id: this._config.span_entity, value: deg }); return;
-    }
+    if (sel && this._hass.states[sel]) { this._hass.callService("select", "select_option", { entity_id: sel, option: `${deg}°` }); return; }
+    if (this._config.span_entity && this._hass.states[this._config.span_entity]) { this._hass.callService("number", "set_value", { entity_id: this._config.span_entity, value: deg }); return; }
     const c = this._center, half = deg / 2;
     let lo = clamp(Math.round(c - half), 0, 350), hi = clamp(Math.round(c + half), 0, 350);
     if (lo === 0) hi = Math.min(350, deg); if (hi === 350) lo = Math.max(0, 350 - deg);
@@ -379,19 +444,29 @@ class DysonOscillationCard extends HTMLElement {
     setTimeout(() => this._hass.callService("number", "set_value", { entity_id: this._config.low_angle_entity, value: lo }), 350);
   }
 
+  _fanGlyph() {
+    if ((this._config.fan_icon || "tower") === "oval") {
+      return `<ellipse class="fan-ring" cx="${CX}" cy="${CY}" rx="34" ry="44" stroke-width="9"/>
+        <rect class="fan" x="${CX - 13}" y="${CY + 30}" width="26" height="34" rx="7"/>`;
+    }
+    // tower: tall Air Multiplier loop (stadium ring) + neck + cylindrical base
+    return `<rect class="fan-ring" x="${CX - 17}" y="104" width="34" height="150" rx="17" stroke-width="7"/>
+      <rect class="fan" x="${CX - 7}" y="248" width="14" height="16" rx="3"/>
+      <rect class="fan" x="${CX - 30}" y="262" width="60" height="40" rx="16"/>`;
+  }
+
   /* ---- render ---- */
   _render() {
     if (!this._built) return;
     const lo = this._low, hi = this._high, c = this._center, span = Math.round(hi - lo);
-    const showTitle = this._config.show_title !== false;
-    const showState = this._config.show_state !== false;
+    const showTitle = this._config.show_title !== false, showState = this._config.show_state !== false;
     this._titleEl.style.display = showTitle ? "" : "none";
-    this._titleEl.textContent = this._config.name || "Oscillatie";
+    this._titleEl.textContent = this._config.name || this._t("title");
     this._readoutEl.style.display = showState ? "" : "none";
-    this._readoutEl.innerHTML = `richting <b>${Math.round(c)}°</b> · breedte <b>${span}°</b>`;
+    this._readoutEl.innerHTML = `${this._t("dir")} <b>${Math.round(c)}°</b> · ${this._t("width")} <b>${span}°</b>`;
     this._headEl.style.display = (showTitle || showState) ? "" : "none";
     this._hintEl.style.display = this._config.show_hint !== false ? "" : "none";
-    this._hintEl.textContent = "Sleep het midden om te richten · sleep een rand om die kant bij te stellen";
+    this._hintEl.textContent = this._t("hint");
 
     let ticks = "";
     for (let d = 0; d <= 350; d += 5) {
@@ -405,15 +480,13 @@ class DysonOscillationCard extends HTMLElement {
       `<path class="edge" d="M ${ps.x.toFixed(1)} ${ps.y.toFixed(1)} A ${R_ARC} ${R_ARC} 0 ${large} 1 ${pe.x.toFixed(1)} ${pe.y.toFixed(1)}"/>`;
     const cp = polar(c, R_ARC);
     const aim = `<line class="aim" x1="${CX}" y1="${CY}" x2="${cp.x.toFixed(1)}" y2="${cp.y.toFixed(1)}"/>`;
-    const fan = `<ellipse class="fan-ring" cx="${CX}" cy="${CY}" rx="34" ry="44" stroke-width="9"/>
-      <rect class="fan" x="${CX - 13}" y="${CY + 30}" width="26" height="34" rx="7"/>`;
     const lp = polar(lo, R_ARC), hp = polar(hi, R_ARC);
     const handles = `
       <circle class="handle" cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="15"/>
       <circle class="handle" cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="15"/>
       <circle class="handle center" cx="${cp.x.toFixed(1)}" cy="${cp.y.toFixed(1)}" r="22"/>
       <text class="hlabel" x="${cp.x.toFixed(1)}" y="${cp.y.toFixed(1)}">${Math.round(c)}</text>`;
-    this._content.innerHTML = ticks + wedge + aim + fan + edge + handles;
+    this._content.innerHTML = ticks + wedge + aim + this._fanGlyph() + edge + handles;
     this._content.classList.toggle("off", !this._available);
     this._hitring.classList.toggle("off", !this._available);
 
@@ -430,23 +503,17 @@ class DysonOscillationCard extends HTMLElement {
       const active = selOpt ? selOpt === `${p}°` : p === span;
       return `<button class="preset ${active ? "sel" : ""}" data-p="${p}">${p}°</button>`;
     }).join("");
-    this._presetsEl.querySelectorAll(".preset").forEach((b) =>
-      b.onclick = () => this._setPreset(parseInt(b.dataset.p, 10)));
+    this._presetsEl.querySelectorAll(".preset").forEach((b) => b.onclick = () => this._setPreset(parseInt(b.dataset.p, 10)));
   }
 
-  // The control row is built ONCE per layout and then updated in place. Rebuilding
-  // it on every state tick would recreate the <ha-icon> and restart its CSS spin
-  // (the cause of the stutter); keeping the element alive lets the animation run
-  // continuously, and the speed is changed via a CSS variable without a restart.
   _renderControls() {
-    const hass = this._hass;
-    const visible = [];
+    const hass = this._hass, visible = [];
     for (const key of (this._config.features || [])) {
       const def = CONTROLS[key]; if (!def) continue;
       const id = def.entity(this._map); const st = id && hass.states[id];
       if (st) visible.push({ key, def, id });
     }
-    const sig = visible.map((v) => v.key).join(",");
+    const sig = this._lang + "|" + visible.map((v) => v.key).join(",");
     if (sig !== this._ctrlSig) { this._buildControls(visible); this._ctrlSig = sig; }
     this._updateControls(visible);
   }
@@ -459,24 +526,20 @@ class DysonOscillationCard extends HTMLElement {
         const el = document.createElement("div");
         el.className = "slider";
         el.innerHTML = `<ha-icon icon="${def.icon}"></ha-icon>
-          <div class="track"><div class="fill"></div><div class="thumb"></div></div>
-          <span class="sval"></span>`;
+          <div class="track"><div class="fill"></div><div class="thumb"></div></div><span class="sval"></span>`;
         this._controlsEl.appendChild(el);
-        const refs = {
-          kind: "slider", root: el, def, id, icon: el.querySelector("ha-icon"),
+        const refs = { kind: "slider", root: el, def, id, icon: el.querySelector("ha-icon"),
           track: el.querySelector(".track"), fill: el.querySelector(".fill"),
-          thumb: el.querySelector(".thumb"), sval: el.querySelector(".sval"),
-          spinning: false, dur: null,
-        };
-        this._ctrlEls[key] = refs;
-        this._wireSlider(refs);
+          thumb: el.querySelector(".thumb"), sval: el.querySelector(".sval"), spinning: false, dur: null };
+        this._ctrlEls[key] = refs; this._wireSlider(refs);
       } else {
         const el = document.createElement("div");
         el.className = def.kind === "badge" ? "chip badge" : "chip";
         el.setAttribute("role", "button"); el.tabIndex = 0;
+        const label = this._t(def.lkey);
         el.innerHTML = def.kind === "badge"
-          ? `<ha-icon icon="${def.icon}"></ha-icon><span class="cval"></span><span class="clabel">${def.label}</span>`
-          : `<ha-icon icon="${def.icon}"></ha-icon><span class="clabel">${def.label}</span>`;
+          ? `<ha-icon icon="${def.icon}"></ha-icon><span class="cval"></span><span class="clabel">${label}</span>`
+          : `<ha-icon icon="${def.icon}"></ha-icon><span class="clabel">${label}</span>`;
         const fire = () => {
           if (this._config.haptics) haptic("light");
           if (def.kind === "badge") fireEvent(this, "hass-more-info", { entityId: id });
@@ -491,40 +554,30 @@ class DysonOscillationCard extends HTMLElement {
   }
 
   _updateControls(visible) {
+    const t = (k) => this._t(k);
     for (const { key, def, id } of visible) {
       const refs = this._ctrlEls[key]; if (!refs) continue;
       const st = this._hass.states[id]; if (!st) continue;
-      if (refs.kind === "toggle") {
-        refs.root.classList.toggle("on", def.active(st));
-      } else if (refs.kind === "badge") {
-        refs.val.textContent = def.text(st);
-      } else if (refs.kind === "slider" && !this._sliderDrag) {
+      if (refs.kind === "toggle") refs.root.classList.toggle("on", def.active(st));
+      else if (refs.kind === "badge") refs.val.textContent = def.text(st, t);
+      else if (refs.kind === "slider" && !this._sliderDrag) {
         const pct = clamp(parseFloat(st.attributes.percentage) || 0, 0, 100);
-        refs.fill.style.width = pct + "%";
-        refs.thumb.style.left = pct + "%";
+        refs.fill.style.width = pct + "%"; refs.thumb.style.left = pct + "%";
         refs.sval.textContent = Math.round(pct / 10);
         this._applyFanSpin(refs, st.state === "on" ? pct : 0);
       }
     }
   }
 
-  // Smooth spin: start the animation once, then only change --fan-dur so the
-  // browser retimes the running animation instead of restarting it.
   _applyFanSpin(refs, pct) {
     const spin = this._config.animate_fan !== false && pct > 0;
-    if (!spin) {
-      if (refs.spinning) { refs.icon.style.animation = ""; refs.spinning = false; refs.dur = null; }
-      return;
-    }
+    if (!spin) { if (refs.spinning) { refs.icon.style.animation = ""; refs.spinning = false; refs.dur = null; } return; }
     const dur = Math.max(0.4, 2.4 - (pct / 100) * 1.9).toFixed(2) + "s";
     if (!refs.spinning) {
       refs.icon.style.setProperty("--fan-dur", dur);
       refs.icon.style.animation = "dyson-spin var(--fan-dur,2s) linear infinite";
       refs.spinning = true; refs.dur = dur;
-    } else if (dur !== refs.dur) {
-      refs.icon.style.setProperty("--fan-dur", dur);
-      refs.dur = dur;
-    }
+    } else if (dur !== refs.dur) { refs.icon.style.setProperty("--fan-dur", dur); refs.dur = dur; }
   }
 
   _wireSlider(refs) {
@@ -533,22 +586,17 @@ class DysonOscillationCard extends HTMLElement {
     const apply = (clientX) => {
       const r = track.getBoundingClientRect();
       let pct = clamp(((clientX - r.left) / r.width) * 100, 0, 100);
-      pct = Math.round(pct / 10) * 10;                      // 10 Dyson levels
-      fill.style.width = pct + "%"; thumb.style.left = pct + "%";
-      sval.textContent = Math.round(pct / 10);
+      pct = Math.round(pct / 10) * 10;
+      fill.style.width = pct + "%"; thumb.style.left = pct + "%"; sval.textContent = Math.round(pct / 10);
       if (pct !== lastPct) {
         lastPct = pct;
         if (this._config.haptics) haptic("selection", 30);
-        this._applyFanSpin(refs, pct);                       // smooth live update
+        this._applyFanSpin(refs, pct);
         clearTimeout(sendTimer);
-        sendTimer = setTimeout(() =>
-          this._hass.callService("fan", "set_percentage", { entity_id: id, percentage: pct }), 120);
+        sendTimer = setTimeout(() => this._hass.callService("fan", "set_percentage", { entity_id: id, percentage: pct }), 120);
       }
     };
-    track.addEventListener("pointerdown", (e) => {
-      e.preventDefault(); this._sliderDrag = true;
-      track.setPointerCapture(e.pointerId); apply(e.clientX);
-    });
+    track.addEventListener("pointerdown", (e) => { e.preventDefault(); this._sliderDrag = true; track.setPointerCapture(e.pointerId); apply(e.clientX); });
     track.addEventListener("pointermove", (e) => { if (this._sliderDrag) apply(e.clientX); });
     const end = (e) => {
       if (!this._sliderDrag) return;
@@ -565,34 +613,26 @@ customElements.define("dyson-oscillation-card", DysonOscillationCard);
 /* ---------- visual config editor --------------------------------------- */
 class DysonOscillationCardEditor extends HTMLElement {
   setConfig(config) { this._config = config; this._render(); }
-  set hass(hass) { this._hass = hass; if (this._form) this._form.hass = hass; }
+  set hass(hass) { this._hass = hass; this._lang = langOf(hass); if (this._form) { this._form.hass = hass; this._render(); } }
   _render() {
+    const t = (k) => tr(this._lang || "en", k);
     if (!this._form) {
       this._form = document.createElement("ha-form");
-      this._form.computeLabel = (s) => ({
-        name: "Titel (optioneel)",
-        center_angle_entity: "Richting / center-hoek (vereist)",
-        low_angle_entity: "Lage hoek — startrand (vereist)",
-        high_angle_entity: "Hoge hoek — eindrand (vereist)",
-        span_entity: "Spanwijdte (optioneel, voor presets + herstel)",
-        show_title: "Toon titel",
-        show_state: "Toon hoek-waarden (richting/breedte)",
-        show_hint: "Toon instructietekst",
-        show_presets: "Toon preset-knoppen",
-        haptics: "Haptische feedback (telefoon)",
-        animate_fan: "Animeer fan-icoon op snelheid",
-        min_span: "Min. breedte bij dubbeltik (°)",
-        features: "Bedieningsknoppen (Mushroom-stijl)",
-      }[s.name] || s.name);
       this._form.addEventListener("value-changed", (e) =>
-        this.dispatchEvent(new CustomEvent("config-changed", {
-          detail: { config: e.detail.value }, bubbles: true, composed: true })));
+        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: e.detail.value }, bubbles: true, composed: true })));
       this.appendChild(this._form);
     }
+    this._form.computeLabel = (s) => ({
+      name: t("e_name"), center_angle_entity: t("e_center"), low_angle_entity: t("e_low"),
+      high_angle_entity: t("e_high"), span_entity: t("e_span"), show_title: t("e_show_title"),
+      show_state: t("e_show_state"), show_hint: t("e_show_hint"), show_presets: t("e_show_presets"),
+      haptics: t("e_haptics"), animate_fan: t("e_animate"), min_span: t("e_minspan"),
+      fan_icon: t("e_fanicon"), features: t("e_features"),
+    }[s.name] || s.name);
     this._form.hass = this._hass;
     this._form.data = {
       show_title: true, show_state: true, show_hint: true, show_presets: true,
-      haptics: true, animate_fan: true, min_span: 35, features: DEFAULT_FEATURES, ...this._config,
+      haptics: true, animate_fan: true, min_span: 35, fan_icon: "tower", features: DEFAULT_FEATURES, ...this._config,
     };
     this._form.schema = [
       { name: "name", selector: { text: {} } },
@@ -600,6 +640,8 @@ class DysonOscillationCardEditor extends HTMLElement {
       { name: "low_angle_entity", required: true, selector: { entity: { domain: "number" } } },
       { name: "high_angle_entity", required: true, selector: { entity: { domain: "number" } } },
       { name: "span_entity", selector: { entity: { domain: "number" } } },
+      { name: "fan_icon", selector: { select: { mode: "dropdown", options: [
+        { value: "tower", label: t("i_tower") }, { value: "oval", label: t("i_oval") } ] } } },
       { name: "show_title", selector: { boolean: {} } },
       { name: "show_state", selector: { boolean: {} } },
       { name: "show_hint", selector: { boolean: {} } },
@@ -608,16 +650,11 @@ class DysonOscillationCardEditor extends HTMLElement {
       { name: "animate_fan", selector: { boolean: {} } },
       { name: "min_span", selector: { number: { min: 5, max: 175, step: 5, mode: "box", unit_of_measurement: "°" } } },
       { name: "features", selector: { select: { multiple: true, mode: "list", options: [
-        { value: "power", label: "Aan/uit" },
-        { value: "oscillation", label: "Oscillatie aan/uit" },
-        { value: "night_mode", label: "Nachtstand" },
-        { value: "auto", label: "Auto-modus" },
-        { value: "continuous_monitoring", label: "Continue monitoring" },
-        { value: "speed", label: "Snelheid (slider)" },
-        { value: "sleep_timer", label: "Slaaptimer" },
-        { value: "air_quality", label: "Luchtkwaliteit" },
-        { value: "filter_life", label: "Filterlevensduur" },
-      ] } } },
+        { value: "power", label: t("o_power") }, { value: "oscillation", label: t("o_oscillation") },
+        { value: "night_mode", label: t("o_night") }, { value: "auto", label: t("o_auto") },
+        { value: "continuous_monitoring", label: t("o_monitor") }, { value: "speed", label: t("o_speed") },
+        { value: "sleep_timer", label: t("o_timer") }, { value: "air_quality", label: t("o_air") },
+        { value: "filter_life", label: t("o_filter") } ] } } },
     ];
   }
 }
@@ -627,7 +664,7 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "dyson-oscillation-card",
   name: "Dyson Oscillation Card",
-  description: "Richt en versmal/verbreed de oscillatie van je Dyson + Mushroom-stijl bediening.",
+  description: "Aim and resize your Dyson's oscillation, with a Mushroom-style control row.",
   preview: true,
   documentationURL: "https://github.com/Dominic-070/dyson-oscillation-card",
 });
