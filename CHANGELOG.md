@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.3] - 2026-06-22
+
+### Fixed
+- Smooth dragging on mobile. `touch-action` on SVG sub-elements is ignored by
+  mobile browsers, which let the page hijack the gesture as a scroll after a
+  degree or two. Scrolling is now blocked directly via a non-passive `touchmove`
+  handler active only while dragging; empty space still scrolls.
+
 ## [1.4.2] - 2026-06-22
 
 ### Fixed
@@ -101,6 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Optional preset row (45 / 90 / 180 / 350°).
 - Visual UI editor with entity pickers; HACS dashboard packaging.
 
+[1.4.3]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.3
 [1.4.2]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.2
 [1.4.1]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.1
 [1.4.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.0

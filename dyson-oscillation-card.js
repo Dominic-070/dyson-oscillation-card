@@ -12,7 +12,7 @@
  * are dragged *relatively*, so they pin to 0°/350° and never hop across the gap.
  */
 
-const VERSION = "1.4.2";
+const VERSION = "1.4.3";
 
 /* ---------- geometry ---------------------------------------------------- */
 const VB = 400, CX = 200, CY = 200;
@@ -343,6 +343,11 @@ class DysonOscillationCard extends HTMLElement {
     this._dragCatch.addEventListener("pointermove", (e) => this._onMove(e));
     this._dragCatch.addEventListener("pointerup", (e) => this._onUp(e));
     this._dragCatch.addEventListener("pointercancel", (e) => this._onUp(e));
+    // Mobile browsers ignore touch-action on SVG sub-elements, so block the page
+    // scroll directly: a non-passive touchmove that preventDefaults while dragging.
+    // (Empty-space touches don't drag, so they still scroll.)
+    this._stage = this.shadowRoot.querySelector(".stage");
+    this._stage.addEventListener("touchmove", (e) => { if (this._dragging) e.preventDefault(); }, { passive: false });
   }
 
   /* ---- coordinate helpers ---- */

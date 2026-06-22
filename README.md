@@ -6,9 +6,6 @@ each outer edge independently** to lengthen or shorten that side, instead of onl
 picking a fixed preset width. Plus an optional **Mushroom-style control row**
 (power, oscillation, night mode, auto, speed, sleep timer, air quality, filter).
 
-<img width="494" height="724" alt="image" src="https://github.com/user-attachments/assets/3375785e-cafd-4e31-bdcf-b0c7a990c492" />
-
-
 Built for the [`cmgrayb/hass-dyson`](https://github.com/cmgrayb/hass-dyson)
 integration. No build step, no dependencies — a single JS file.
 
