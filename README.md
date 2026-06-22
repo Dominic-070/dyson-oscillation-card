@@ -11,9 +11,13 @@ integration. No build step, no dependencies — a single JS file.
 
 - **Drag the centre knob** to aim the direction (keeps the current width).
 - **Drag the start/end edge** to extend or retract just that side.
-- Dragging an edge across the top dead-zone **stops at the boundary** (0° / 350°)
-  instead of flipping to the far side; dragging one edge past the other collapses
-  the width to 0° (point-aim).
+- Edges are dragged **relatively**, so dragging across the top dead-zone **stops
+  at the boundary** (0° / 350°) and never flips to the far side; dragging one edge
+  past the other collapses the width to 0° (point-aim).
+- **Double-tap the centre angle** to expand a collapsed (0°) width back to a
+  usable minimum (`min_span`, default 35°).
+- Only a **narrow band around the ring** reacts to touch, so the empty corners
+  and centre can be used to **scroll** the dashboard on mobile.
 - **Haptic feedback** while dragging and on taps (Companion app on your phone).
 - **Preset buttons** (45/90/180/350°) use the oscillation `select` so the centre
   is preserved (falls back to the span number).
@@ -93,8 +97,13 @@ features:
 | `high_angle_entity` | ✅ | — | End edge (0–350) |
 | `span_entity` | — | auto | Width number, preset fallback |
 | `name` | — | `Oscillatie` | Card title |
+| `show_title` | — | `true` | Show the card title |
+| `show_state` | — | `true` | Show the direction / width read-out |
+| `show_hint` | — | `true` | Show the instruction line |
 | `show_presets` | — | `true` | Show the preset row |
 | `haptics` | — | `true` | Haptic feedback on phone (Companion app) |
+| `animate_fan` | — | `true` | Spin the speed slider's fan icon with the speed |
+| `min_span` | — | `35` | Width restored by a double-tap on the centre |
 | `features` | — | power, oscillation, night_mode, auto, speed | Control buttons to show, in order |
 
 Available `features`: `power`, `oscillation`, `night_mode`, `auto`,

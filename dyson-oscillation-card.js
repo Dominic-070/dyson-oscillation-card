@@ -2,20 +2,21 @@
  * Dyson Oscillation Card
  * Aim and shape the oscillation of a Dyson fan from Home Assistant, inspired by
  * the MyDyson app — drag the centre to aim, drag each edge to lengthen/shorten
- * that side, plus an optional Mushroom-style control row (power, oscillation,
- * night mode, auto, speed, sleep timer, air quality, filter).
+ * that side, plus an optional Mushroom-style control row.
  *
  * For the hass-dyson integration (cmgrayb/hass-dyson). No build step, no deps.
  *
  * Angles run 0–350°. 175° points forward (toward you, bottom of the dial).
- * The 10° dead-zone (350°→0°) sits at the top — the back of the fan.
+ * The 10° dead-zone (350°→0°) sits at the top — the back of the fan. Handles
+ * are dragged *relatively*, so they pin to 0°/350° and never hop across the gap.
  */
 
-const VERSION = "1.1.0";
+const VERSION = "1.3.0";
 
 /* ---------- geometry ---------------------------------------------------- */
 const VB = 400, CX = 200, CY = 200;
 const R_ARC = 150, R_FILL = 150, R_TICK_OUT = 176, R_TICK_IN = 138;
+const HIT_W = 92;                 // width of the touch band around the ring
 const DEG2RAD = Math.PI / 180;
 const screenDeg = (d) => d - 85;
 const polar = (d, r) => {
@@ -31,9 +32,8 @@ function fireEvent(node, type, detail) {
   node.dispatchEvent(ev);
   return ev;
 }
-// Companion-app haptics. No-op on desktop.
 let _lastHaptic = 0;
-function haptic(type, minGap = 0) {
+function haptic(type, minGap = 0) {                 // Companion-app haptics; no-op on desktop
   const now = Date.now();
   if (now - _lastHaptic < minGap) return;
   _lastHaptic = now;
@@ -41,69 +41,48 @@ function haptic(type, minGap = 0) {
 }
 
 /* ---------- Mushroom-style control catalogue ---------------------------- */
-// Each control resolves an entity from the auto-detected map and renders a chip,
-// a slider, or a read-only badge. Anything whose entity is missing is hidden,
-// which is what makes the card model-agnostic across the hass-dyson line-up.
 const CONTROLS = {
   power: {
     label: "Aan/uit", icon: "mdi:power", kind: "toggle",
-    entity: (m) => m.fan,
-    active: (s) => s && s.state === "on",
+    entity: (m) => m.fan, active: (s) => s && s.state === "on",
     tap: (hass, id) => hass.callService("homeassistant", "toggle", { entity_id: id }),
   },
   oscillation: {
     label: "Oscillatie", icon: "mdi:arrow-left-right", kind: "toggle",
-    entity: (m) => m.fan,
-    active: (s) => !!(s && s.attributes && s.attributes.oscillating),
+    entity: (m) => m.fan, active: (s) => !!(s && s.attributes && s.attributes.oscillating),
     tap: (hass, id, s) => hass.callService("fan", "oscillate", {
-      entity_id: id, oscillating: !(s && s.attributes && s.attributes.oscillating),
-    }),
+      entity_id: id, oscillating: !(s && s.attributes && s.attributes.oscillating) }),
   },
   night_mode: {
-    label: "Nachtstand", icon: "mdi:weather-night", kind: "toggle",
-    entity: (m) => m.night_mode,
-    active: (s) => s && s.state === "on",
+    label: "Nacht", icon: "mdi:weather-night", kind: "toggle",
+    entity: (m) => m.night_mode, active: (s) => s && s.state === "on",
     tap: (hass, id) => hass.callService("homeassistant", "toggle", { entity_id: id }),
   },
   auto: {
     label: "Auto", icon: "mdi:fan-auto", kind: "toggle",
-    entity: (m) => m.fan,
-    active: (s) => !!(s && s.attributes && s.attributes.preset_mode === "auto"),
+    entity: (m) => m.fan, active: (s) => !!(s && s.attributes && s.attributes.preset_mode === "auto"),
     tap: (hass, id, s) => hass.callService("fan", "set_preset_mode", {
-      entity_id: id,
-      preset_mode: s && s.attributes && s.attributes.preset_mode === "auto" ? "manual" : "auto",
-    }),
+      entity_id: id, preset_mode: s && s.attributes && s.attributes.preset_mode === "auto" ? "manual" : "auto" }),
   },
   continuous_monitoring: {
-    label: "Monitoring", icon: "mdi:eye", kind: "toggle",
-    entity: (m) => m.continuous_monitoring,
-    active: (s) => s && s.state === "on",
+    label: "Monitor", icon: "mdi:eye", kind: "toggle",
+    entity: (m) => m.continuous_monitoring, active: (s) => s && s.state === "on",
     tap: (hass, id) => hass.callService("homeassistant", "toggle", { entity_id: id }),
   },
-  speed: {
-    label: "Snelheid", icon: "mdi:fan", kind: "slider",
-    entity: (m) => m.fan,
-  },
+  speed: { label: "Snelheid", icon: "mdi:fan", kind: "slider", entity: (m) => m.fan },
   sleep_timer: {
-    label: "Slaaptimer", icon: "mdi:timer-outline", kind: "badge",
+    label: "Timer", icon: "mdi:timer-outline", kind: "badge",
     entity: (m) => m.sleep_timer,
-    text: (s) => {
-      const v = parseFloat(s.state);
-      return Number.isFinite(v) && v > 0 ? `${Math.round(v)} min` : "Uit";
-    },
+    text: (s) => { const v = parseFloat(s.state); return Number.isFinite(v) && v > 0 ? `${Math.round(v)}m` : "Uit"; },
   },
   air_quality: {
     label: "Lucht", icon: "mdi:air-filter", kind: "badge",
-    entity: (m) => m.air_quality,
-    text: (s) => s.state,
+    entity: (m) => m.air_quality, text: (s) => s.state,
   },
   filter_life: {
     label: "Filter", icon: "mdi:air-purifier", kind: "badge",
     entity: (m) => m.filter_life,
-    text: (s) => {
-      const v = parseFloat(s.state);
-      return Number.isFinite(v) ? `${Math.round(v)}%` : s.state;
-    },
+    text: (s) => { const v = parseFloat(s.state); return Number.isFinite(v) ? `${Math.round(v)}%` : s.state; },
   },
 };
 const DEFAULT_FEATURES = ["power", "oscillation", "night_mode", "auto", "speed"];
@@ -116,11 +95,9 @@ class DysonOscillationCard extends HTMLElement {
     this._dragging = null;
     this._center = 175; this._low = 0; this._high = 350;
     this._pending = {}; this._lastSend = 0; this._sendTimer = null;
-    this._hapticAngle = 0;
     this._sliderDrag = false;
   }
 
-  /* ---- config + auto-detect ---- */
   static getStubConfig(hass) {
     const find = (suffix) => Object.keys(hass.states).find(
       (e) => e.startsWith("number.") && e.endsWith(suffix));
@@ -135,30 +112,24 @@ class DysonOscillationCard extends HTMLElement {
     };
   }
 
-  static getConfigElement() {
-    return document.createElement("dyson-oscillation-card-editor");
-  }
+  static getConfigElement() { return document.createElement("dyson-oscillation-card-editor"); }
 
   setConfig(config) {
     if (!config.center_angle_entity || !config.low_angle_entity || !config.high_angle_entity)
       throw new Error("Stel center_angle_entity, low_angle_entity en high_angle_entity in.");
     this._config = {
-      show_presets: true,
-      presets: [45, 90, 180, 350],
-      features: [...DEFAULT_FEATURES],
-      haptics: true,
+      show_presets: true, show_hint: true, show_title: true, show_state: true,
+      haptics: true, animate_fan: true, min_span: 35,
+      presets: [45, 90, 180, 350], features: [...DEFAULT_FEATURES],
       ...config,
     };
     this._map = this._deriveEntities(this._config);
     this._built = false;
   }
 
-  // Build the related-entity map from the device slug shared by the angle numbers.
   _deriveEntities(cfg) {
     const m = {};
-    const slug = cfg.center_angle_entity
-      .replace(/^number\./, "")
-      .replace(/_oscillation_center_angle$/, "");
+    const slug = cfg.center_angle_entity.replace(/^number\./, "").replace(/_oscillation_center_angle$/, "");
     const d = (domain, suffix) => `${domain}.${slug}${suffix}`;
     m.fan = cfg.fan_entity || `fan.${slug}`;
     m.night_mode = cfg.night_mode_entity || d("switch", "_night_mode");
@@ -172,15 +143,11 @@ class DysonOscillationCard extends HTMLElement {
 
   getCardSize() { return 6; }
 
-  /* ---- hass ---- */
   set hass(hass) {
     this._hass = hass;
     if (!this._built) this._build();
     if (this._dragging || this._sliderDrag) return;
-    const num = (id, fb) => {
-      const s = hass.states[id]; const v = s ? parseFloat(s.state) : NaN;
-      return Number.isFinite(v) ? v : fb;
-    };
+    const num = (id, fb) => { const s = hass.states[id]; const v = s ? parseFloat(s.state) : NaN; return Number.isFinite(v) ? v : fb; };
     this._low = clamp(num(this._config.low_angle_entity, 0), 0, 350);
     this._high = clamp(num(this._config.high_angle_entity, 350), 0, 350);
     if (this._high < this._low) [this._low, this._high] = [this._high, this._low];
@@ -200,20 +167,23 @@ class DysonOscillationCard extends HTMLElement {
           --acc: var(--dyson-accent, var(--primary-color, #7C5CFF));
           --acc-soft: color-mix(in srgb, var(--acc) 26%, transparent);
           --chip-bg: var(--card-background-color, #1c1c1c); }
-        .head { display:flex; align-items:baseline; justify-content:space-between; margin:0 4px 4px; }
+        @keyframes dyson-spin { from { transform:rotate(0deg);} to { transform:rotate(360deg);} }
+        .head { display:flex; align-items:baseline; justify-content:space-between; margin:0 4px 4px; min-height:1px; }
         .title { font-size:1.05rem; font-weight:600; color:var(--primary-text-color); }
         .readout { font-variant-numeric:tabular-nums; font-size:.82rem; color:var(--secondary-text-color); }
         .readout b { color:var(--primary-text-color); font-weight:600; }
         .stage { width:100%; max-width:380px; margin:0 auto; }
-        svg { width:100%; height:auto; display:block; touch-action:none; user-select:none; -webkit-user-select:none; }
+        /* svg ignores pointers except on the hit-ring, so empty corners scroll */
+        svg { width:100%; height:auto; display:block; pointer-events:none; touch-action:auto; }
+        #hitring { pointer-events:stroke; touch-action:none; cursor:grab; }
         .tick { stroke:var(--divider-color,#444); stroke-width:2.4; stroke-linecap:round; }
         .tick.on { stroke:var(--acc); }
         .wedge { fill:var(--acc-soft); }
         .edge { stroke:var(--acc); stroke-width:5; fill:none; stroke-linecap:round; }
-        .handle { fill:var(--chip-bg); stroke:var(--acc); stroke-width:4; cursor:grab; }
+        .handle { fill:var(--chip-bg); stroke:var(--acc); stroke-width:4; }
         .handle.center { stroke-width:5; }
         .hlabel { fill:var(--primary-text-color); font-size:15px; font-weight:600; text-anchor:middle;
-          dominant-baseline:central; pointer-events:none; font-variant-numeric:tabular-nums; }
+          dominant-baseline:central; font-variant-numeric:tabular-nums; }
         .fan { fill:var(--primary-text-color); opacity:.85; }
         .fan-ring { fill:none; stroke:var(--primary-text-color); opacity:.85; }
         .aim { stroke:var(--acc); stroke-width:3; stroke-dasharray:2 7; stroke-linecap:round; opacity:.8; }
@@ -224,126 +194,154 @@ class DysonOscillationCard extends HTMLElement {
           font:inherit; font-size:.9rem; font-weight:600; cursor:pointer; transition:.15s; }
         .preset:hover { border-color:var(--acc); }
         .preset.sel { background:var(--acc); border-color:var(--acc); color:#fff; }
-        .off { opacity:.45; pointer-events:none; }
+        .off { opacity:.45; }
+        #hitring.off { pointer-events:none; }
 
-        .controls { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
-        .chip { flex:1 1 64px; min-width:64px; display:flex; flex-direction:column; align-items:center;
-          gap:5px; padding:11px 6px; border-radius:16px; background:var(--chip-bg);
-          border:1px solid var(--divider-color,#333); cursor:pointer; transition:.15s; }
+        /* 4-up grid so the chips stay narrow on mobile */
+        .controls { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px; }
+        .chip { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+          padding:9px 3px; border-radius:14px; background:var(--chip-bg);
+          border:1px solid var(--divider-color,#333); cursor:pointer; transition:.15s; min-width:0; }
         .chip:hover { border-color:var(--acc); }
-        .chip ha-icon { --mdc-icon-size:24px; color:var(--primary-text-color); }
-        .chip .clabel { font-size:.7rem; color:var(--secondary-text-color); text-align:center; line-height:1.1; }
+        .chip ha-icon { --mdc-icon-size:22px; color:var(--primary-text-color); }
+        .chip .clabel { font-size:.64rem; color:var(--secondary-text-color); text-align:center; line-height:1.05;
+          white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
         .chip.on { background:var(--acc); border-color:var(--acc); }
         .chip.on ha-icon, .chip.on .clabel { color:#fff; }
-        .chip.badge { cursor:pointer; }
-        .chip.badge .cval { font-size:.85rem; font-weight:600; color:var(--primary-text-color); }
+        .chip.badge .cval { font-size:.8rem; font-weight:600; color:var(--primary-text-color); }
 
-        .slider { flex:1 1 100%; display:flex; align-items:center; gap:12px; padding:12px 14px;
-          border-radius:18px; background:var(--chip-bg); border:1px solid var(--divider-color,#333);
-          touch-action:none; user-select:none; }
-        .slider ha-icon { --mdc-icon-size:22px; color:var(--primary-text-color); flex:0 0 auto; }
-        .track { position:relative; flex:1 1 auto; height:10px; border-radius:6px;
-          background:var(--divider-color,#3a3a3a); cursor:pointer; }
-        .fill { position:absolute; inset:0 auto 0 0; border-radius:6px; background:var(--acc); }
-        .sval { flex:0 0 auto; min-width:1.6em; text-align:right; font-weight:600;
+        .slider { grid-column:1 / -1; display:flex; align-items:center; gap:12px; padding:10px 14px;
+          border-radius:18px; background:var(--chip-bg); border:1px solid var(--divider-color,#333); }
+        .slider ha-icon { --mdc-icon-size:24px; color:var(--primary-text-color); flex:0 0 auto; transform-origin:50% 50%; }
+        .track { position:relative; flex:1 1 auto; height:34px; border-radius:12px;
+          background:var(--divider-color,#3a3a3a); cursor:pointer; touch-action:none; overflow:hidden; }
+        .fill { position:absolute; left:0; top:0; bottom:0; border-radius:12px; background:var(--acc); min-width:12px; }
+        .thumb { position:absolute; top:50%; width:5px; height:22px; border-radius:3px; background:#fff;
+          transform:translate(-50%,-50%); box-shadow:0 0 5px rgba(0,0,0,.45); pointer-events:none; }
+        .sval { flex:0 0 auto; min-width:1.4em; text-align:right; font-weight:600;
           font-variant-numeric:tabular-nums; color:var(--primary-text-color); }
       </style>
       <ha-card>
         <div class="head"><span class="title"></span><span class="readout"></span></div>
-        <div class="stage"><svg viewBox="0 0 ${VB} ${VB}" id="svg"><g id="content"></g></svg></div>
-        <div class="hint">Sleep het midden om te richten · sleep een rand om die kant bij te stellen</div>
+        <div class="stage"><svg viewBox="0 0 ${VB} ${VB}" id="svg">
+          <g id="content"></g>
+          <circle id="hitring" cx="${CX}" cy="${CY}" r="${R_ARC}" fill="none" stroke="transparent" stroke-width="${HIT_W}"/>
+        </svg></div>
+        <div class="hint"></div>
         <div class="presets"></div>
         <div class="controls"></div>
       </ha-card>`;
     this._svg = this.shadowRoot.getElementById("svg");
     this._content = this.shadowRoot.getElementById("content");
+    this._hitring = this.shadowRoot.getElementById("hitring");
+    this._headEl = this.shadowRoot.querySelector(".head");
     this._titleEl = this.shadowRoot.querySelector(".title");
     this._readoutEl = this.shadowRoot.querySelector(".readout");
+    this._hintEl = this.shadowRoot.querySelector(".hint");
     this._presetsEl = this.shadowRoot.querySelector(".presets");
     this._controlsEl = this.shadowRoot.querySelector(".controls");
-    this._svg.addEventListener("pointerdown", (e) => this._onDown(e));
-    this._svg.addEventListener("pointermove", (e) => this._onMove(e));
-    this._svg.addEventListener("pointerup", (e) => this._onUp(e));
-    this._svg.addEventListener("pointercancel", (e) => this._onUp(e));
+    this._hitring.addEventListener("pointerdown", (e) => this._onDown(e));
+    this._hitring.addEventListener("pointermove", (e) => this._onMove(e));
+    this._hitring.addEventListener("pointerup", (e) => this._onUp(e));
+    this._hitring.addEventListener("pointercancel", (e) => this._onUp(e));
   }
 
   /* ---- coordinate helpers ---- */
-  // ref = current value of the handle being dragged; used so dragging across the
-  // top dead-zone clamps to the *near* boundary instead of flipping to the far one.
-  _toDevice(clientX, clientY, ref) {
+  _screenAngle(clientX, clientY) {
     const r = this._svg.getBoundingClientRect();
     const sx = ((clientX - r.left) / r.width) * VB;
     const sy = ((clientY - r.top) / r.height) * VB;
-    let deg = Math.atan2(sy - CY, sx - CX) / DEG2RAD;
-    let d = ((deg + 85) % 360 + 360) % 360;
-    if (d > 350) {
-      d = ref == null
-        ? (360 - d < d - 350 ? 0 : 350)            // no reference: nearest boundary
-        : (Math.abs(ref - 0) <= Math.abs(ref - 350) ? 0 : 350); // stay on the handle's side
-    }
-    return d;
+    return Math.atan2(sy - CY, sx - CX) / DEG2RAD;
   }
-
-  _nearestHandle(clientX, clientY) {
+  _pickHandle(clientX, clientY) {
     const r = this._svg.getBoundingClientRect();
     const sx = ((clientX - r.left) / r.width) * VB;
     const sy = ((clientY - r.top) / r.height) * VB;
     const dist = (d) => { const p = polar(d, R_ARC); return Math.hypot(p.x - sx, p.y - sy); };
     const c = [["center", dist(this._center)], ["low", dist(this._low)], ["high", dist(this._high)]]
       .sort((a, b) => a[1] - b[1]);
-    return c[0][1] < 40 ? c[0][0] : "center";
+    return c[0][1] < 45 ? c[0][0] : "center";
   }
 
-  /* ---- dial drag ---- */
+  /* ---- relative drag (no absolute-angle teleport across the rear gap) ---- */
   _onDown(e) {
     if (!this._available) return;
+    const handle = this._pickHandle(e.clientX, e.clientY);
+    const now = Date.now();
+    const dbl = handle === "center" && now - (this._lastTap || 0) < 320;
+    this._lastTap = now;
+    // double-tap the collapsed point to recover a usable width
+    if (dbl && (this._high - this._low) < (this._config.min_span || 35)) {
+      e.preventDefault();
+      this._restoreSpan(this._config.min_span || 35);
+      return;
+    }
     e.preventDefault();
-    this._dragging = this._nearestHandle(e.clientX, e.clientY);
-    this._svg.setPointerCapture(e.pointerId);
-    this._hapticAngle = this._dragging === "low" ? this._low
-      : this._dragging === "high" ? this._high : this._center;
+    this._dragging = handle;
+    this._hitring.setPointerCapture(e.pointerId);
+    this._dragPrevAngle = this._screenAngle(e.clientX, e.clientY);
+    this._dragValue = handle === "low" ? this._low : handle === "high" ? this._high : this._center;
+    this._hapticValue = this._dragValue;
     if (this._config.haptics) haptic("selection");
-    this._onMove(e);
   }
 
   _onMove(e) {
     if (!this._dragging) return;
     e.preventDefault();
-    const ref = this._dragging === "low" ? this._low
-      : this._dragging === "high" ? this._high : this._center;
-    const d = this._toDevice(e.clientX, e.clientY, ref);
+    const a = this._screenAngle(e.clientX, e.clientY);
+    const delta = ((a - this._dragPrevAngle + 540) % 360) - 180;  // shortest signed step
+    this._dragPrevAngle = a;
+    let lo, hi;
+    if (this._dragging === "low") { lo = 0; hi = this._high; }
+    else if (this._dragging === "high") { lo = this._low; hi = 350; }
+    else { const half = Math.floor((this._high - this._low) / 2); lo = half; hi = 350 - half; }
+    const v = clamp(this._dragValue + delta, lo, hi);
+    this._dragValue = v;
 
     if (this._dragging === "low") {
-      this._low = clamp(Math.round(d), 0, this._high);
-      this._center = (this._low + this._high) / 2;
+      this._low = Math.round(v); this._center = (this._low + this._high) / 2;
       this._queue(this._config.low_angle_entity, this._low);
     } else if (this._dragging === "high") {
-      this._high = clamp(Math.round(d), this._low, 350);
-      this._center = (this._low + this._high) / 2;
+      this._high = Math.round(v); this._center = (this._low + this._high) / 2;
       this._queue(this._config.high_angle_entity, this._high);
     } else {
-      const span = this._high - this._low;
-      const c = clamp(Math.round(d), 0, 350), half = Math.floor(span / 2);
-      let lo = Math.max(0, c - half), hi = Math.min(350, c + half);
-      if (lo === 0) hi = Math.min(350, span); else if (hi === 350) lo = Math.max(0, 350 - span);
-      this._low = lo; this._high = hi; this._center = (lo + hi) / 2;
-      this._queue(this._config.center_angle_entity, c);
+      this._applyCenter(Math.round(v));
     }
-
-    if (this._config.haptics) {
-      const cur = this._dragging === "low" ? this._low
-        : this._dragging === "high" ? this._high : this._center;
-      if (Math.abs(cur - this._hapticAngle) >= 4) { haptic("selection", 30); this._hapticAngle = cur; }
-    }
+    if (this._config.haptics && Math.abs(v - this._hapticValue) >= 4) { haptic("selection", 30); this._hapticValue = v; }
     this._render();
   }
 
   _onUp(e) {
     if (!this._dragging) return;
-    try { this._svg.releasePointerCapture(e.pointerId); } catch (_) {}
+    try { this._hitring.releasePointerCapture(e.pointerId); } catch (_) {}
     this._dragging = null;
     if (this._config.haptics) haptic("light");
     this._flush();
+    this._render();
+  }
+
+  _applyCenter(c) {
+    c = clamp(Math.round(c), 0, 350);
+    const span = this._high - this._low, half = Math.floor(span / 2);
+    let lo = Math.max(0, c - half), hi = Math.min(350, c + half);
+    if (lo === 0) hi = Math.min(350, span); else if (hi === 350) lo = Math.max(0, 350 - span);
+    this._low = lo; this._high = hi; this._center = (lo + hi) / 2;
+    this._queue(this._config.center_angle_entity, c);
+  }
+
+  _restoreSpan(deg) {
+    const c = Math.round(this._center);
+    let lo = clamp(c - Math.floor(deg / 2), 0, 350);
+    let hi = clamp(lo + deg, 0, 350);
+    if (hi - lo < deg) lo = clamp(hi - deg, 0, 350);
+    this._low = lo; this._high = hi; this._center = (lo + hi) / 2;
+    if (this._config.haptics) haptic("medium");
+    if (this._config.span_entity && this._hass.states[this._config.span_entity]) {
+      this._hass.callService("number", "set_value", { entity_id: this._config.span_entity, value: hi - lo });
+    } else {
+      this._hass.callService("number", "set_value", { entity_id: this._config.high_angle_entity, value: hi });
+      setTimeout(() => this._hass.callService("number", "set_value", { entity_id: this._config.low_angle_entity, value: lo }), 350);
+    }
     this._render();
   }
 
@@ -364,32 +362,35 @@ class DysonOscillationCard extends HTMLElement {
       this._hass.callService("number", "set_value", { entity_id, value });
   }
 
-  /* ---- presets (prefer the oscillation select; keeps centre) ---- */
   _setPreset(deg) {
     if (this._config.haptics) haptic("medium");
     const sel = this._map.oscillation_select;
     if (sel && this._hass.states[sel]) {
-      this._hass.callService("select", "select_option", { entity_id: sel, option: `${deg}°` });
-      return;
+      this._hass.callService("select", "select_option", { entity_id: sel, option: `${deg}°` }); return;
     }
     if (this._config.span_entity && this._hass.states[this._config.span_entity]) {
-      this._hass.callService("number", "set_value", { entity_id: this._config.span_entity, value: deg });
-      return;
+      this._hass.callService("number", "set_value", { entity_id: this._config.span_entity, value: deg }); return;
     }
     const c = this._center, half = deg / 2;
     let lo = clamp(Math.round(c - half), 0, 350), hi = clamp(Math.round(c + half), 0, 350);
     if (lo === 0) hi = Math.min(350, deg); if (hi === 350) lo = Math.max(0, 350 - deg);
     this._hass.callService("number", "set_value", { entity_id: this._config.high_angle_entity, value: hi });
-    setTimeout(() => this._hass.callService("number", "set_value",
-      { entity_id: this._config.low_angle_entity, value: lo }), 350);
+    setTimeout(() => this._hass.callService("number", "set_value", { entity_id: this._config.low_angle_entity, value: lo }), 350);
   }
 
   /* ---- render ---- */
   _render() {
     if (!this._built) return;
     const lo = this._low, hi = this._high, c = this._center, span = Math.round(hi - lo);
+    const showTitle = this._config.show_title !== false;
+    const showState = this._config.show_state !== false;
+    this._titleEl.style.display = showTitle ? "" : "none";
     this._titleEl.textContent = this._config.name || "Oscillatie";
+    this._readoutEl.style.display = showState ? "" : "none";
     this._readoutEl.innerHTML = `richting <b>${Math.round(c)}°</b> · breedte <b>${span}°</b>`;
+    this._headEl.style.display = (showTitle || showState) ? "" : "none";
+    this._hintEl.style.display = this._config.show_hint !== false ? "" : "none";
+    this._hintEl.textContent = "Sleep het midden om te richten · sleep een rand om die kant bij te stellen";
 
     let ticks = "";
     for (let d = 0; d <= 350; d += 5) {
@@ -407,12 +408,13 @@ class DysonOscillationCard extends HTMLElement {
       <rect class="fan" x="${CX - 13}" y="${CY + 30}" width="26" height="34" rx="7"/>`;
     const lp = polar(lo, R_ARC), hp = polar(hi, R_ARC);
     const handles = `
-      <circle class="handle" data-h="low"  cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="15"/>
-      <circle class="handle" data-h="high" cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="15"/>
-      <circle class="handle center" data-h="center" cx="${cp.x.toFixed(1)}" cy="${cp.y.toFixed(1)}" r="22"/>
+      <circle class="handle" cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="15"/>
+      <circle class="handle" cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="15"/>
+      <circle class="handle center" cx="${cp.x.toFixed(1)}" cy="${cp.y.toFixed(1)}" r="22"/>
       <text class="hlabel" x="${cp.x.toFixed(1)}" y="${cp.y.toFixed(1)}">${Math.round(c)}</text>`;
     this._content.innerHTML = ticks + wedge + aim + fan + edge + handles;
-    this._svg.classList.toggle("off", !this._available);
+    this._content.classList.toggle("off", !this._available);
+    this._hitring.classList.toggle("off", !this._available);
 
     this._renderPresets(span);
     this._renderControls();
@@ -432,28 +434,26 @@ class DysonOscillationCard extends HTMLElement {
   }
 
   _renderControls() {
-    const feats = this._config.features || [];
-    const hass = this._hass;
+    const feats = this._config.features || [], hass = this._hass;
     let html = "";
     for (const key of feats) {
       const def = CONTROLS[key]; if (!def) continue;
-      const id = def.entity(this._map);
-      const st = id && hass.states[id]; if (!st) continue; // auto-hide if absent
-
+      const id = def.entity(this._map); const st = id && hass.states[id]; if (!st) continue;
       if (def.kind === "toggle") {
         const on = def.active(st);
         html += `<div class="chip ${on ? "on" : ""}" data-key="${key}" data-id="${id}" role="button" tabindex="0">
           <ha-icon icon="${def.icon}"></ha-icon><span class="clabel">${def.label}</span></div>`;
       } else if (def.kind === "badge") {
         html += `<div class="chip badge" data-key="${key}" data-id="${id}" role="button" tabindex="0">
-          <ha-icon icon="${def.icon}"></ha-icon><span class="cval">${def.text(st)}</span>
-          <span class="clabel">${def.label}</span></div>`;
+          <ha-icon icon="${def.icon}"></ha-icon><span class="cval">${def.text(st)}</span><span class="clabel">${def.label}</span></div>`;
       } else if (def.kind === "slider") {
-        const pct = clamp(parseFloat(st.attributes.percentage) || 0, 0, 100);
-        const lvl = Math.round(pct / 10);
+        const pct = clamp(parseFloat(st.attributes.percentage) || 0, 0, 100), lvl = Math.round(pct / 10);
+        const spin = this._config.animate_fan !== false && st.state === "on" && pct > 0;
+        const dur = Math.max(0.4, 2.4 - (pct / 100) * 1.9).toFixed(2);
+        const iconStyle = spin ? `animation:dyson-spin ${dur}s linear infinite;` : "";
         html += `<div class="slider" data-key="${key}" data-id="${id}">
-          <ha-icon icon="${def.icon}"></ha-icon>
-          <div class="track" data-track="1"><div class="fill" style="width:${pct}%"></div></div>
+          <ha-icon icon="${def.icon}" style="${iconStyle}"></ha-icon>
+          <div class="track"><div class="fill" style="width:${pct}%"></div><div class="thumb" style="left:${pct}%"></div></div>
           <span class="sval">${lvl}</span></div>`;
       }
     }
@@ -469,7 +469,6 @@ class DysonOscillationCard extends HTMLElement {
       el.onclick = fire;
       el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fire(); } };
     });
-
     const slider = this._controlsEl.querySelector(".slider");
     if (slider) this._wireSlider(slider);
   }
@@ -478,17 +477,25 @@ class DysonOscillationCard extends HTMLElement {
     const id = slider.dataset.id;
     const track = slider.querySelector(".track");
     const fill = slider.querySelector(".fill");
+    const thumb = slider.querySelector(".thumb");
     const sval = slider.querySelector(".sval");
+    const icon = slider.querySelector("ha-icon");
     let lastPct = -1, sendTimer = null;
-    const setFromEvent = (clientX) => {
+    const apply = (clientX) => {
       const r = track.getBoundingClientRect();
       let pct = clamp(((clientX - r.left) / r.width) * 100, 0, 100);
-      pct = Math.round(pct / 10) * 10;                 // snap to 10 Dyson levels
-      fill.style.width = pct + "%";
+      pct = Math.round(pct / 10) * 10;                      // 10 Dyson levels
+      fill.style.width = pct + "%"; if (thumb) thumb.style.left = pct + "%";
       sval.textContent = Math.round(pct / 10);
       if (pct !== lastPct) {
         lastPct = pct;
         if (this._config.haptics) haptic("selection", 30);
+        if (icon) {                                          // live-update the spin
+          if (this._config.animate_fan !== false && pct > 0) {
+            const dur = Math.max(0.4, 2.4 - (pct / 100) * 1.9).toFixed(2);
+            icon.style.animation = `dyson-spin ${dur}s linear infinite`;
+          } else icon.style.animation = "";
+        }
         clearTimeout(sendTimer);
         sendTimer = setTimeout(() =>
           this._hass.callService("fan", "set_percentage", { entity_id: id, percentage: pct }), 120);
@@ -496,9 +503,9 @@ class DysonOscillationCard extends HTMLElement {
     };
     track.addEventListener("pointerdown", (e) => {
       e.preventDefault(); this._sliderDrag = true;
-      track.setPointerCapture(e.pointerId); setFromEvent(e.clientX);
+      track.setPointerCapture(e.pointerId); apply(e.clientX);
     });
-    track.addEventListener("pointermove", (e) => { if (this._sliderDrag) setFromEvent(e.clientX); });
+    track.addEventListener("pointermove", (e) => { if (this._sliderDrag) apply(e.clientX); });
     const end = (e) => {
       if (!this._sliderDrag) return;
       this._sliderDrag = false;
@@ -523,9 +530,14 @@ class DysonOscillationCardEditor extends HTMLElement {
         center_angle_entity: "Richting / center-hoek (vereist)",
         low_angle_entity: "Lage hoek — startrand (vereist)",
         high_angle_entity: "Hoge hoek — eindrand (vereist)",
-        span_entity: "Spanwijdte (optioneel, voor presets)",
+        span_entity: "Spanwijdte (optioneel, voor presets + herstel)",
+        show_title: "Toon titel",
+        show_state: "Toon hoek-waarden (richting/breedte)",
+        show_hint: "Toon instructietekst",
         show_presets: "Toon preset-knoppen",
         haptics: "Haptische feedback (telefoon)",
+        animate_fan: "Animeer fan-icoon op snelheid",
+        min_span: "Min. breedte bij dubbeltik (°)",
         features: "Bedieningsknoppen (Mushroom-stijl)",
       }[s.name] || s.name);
       this._form.addEventListener("value-changed", (e) =>
@@ -534,15 +546,23 @@ class DysonOscillationCardEditor extends HTMLElement {
       this.appendChild(this._form);
     }
     this._form.hass = this._hass;
-    this._form.data = { haptics: true, show_presets: true, features: DEFAULT_FEATURES, ...this._config };
+    this._form.data = {
+      show_title: true, show_state: true, show_hint: true, show_presets: true,
+      haptics: true, animate_fan: true, min_span: 35, features: DEFAULT_FEATURES, ...this._config,
+    };
     this._form.schema = [
       { name: "name", selector: { text: {} } },
       { name: "center_angle_entity", required: true, selector: { entity: { domain: "number" } } },
       { name: "low_angle_entity", required: true, selector: { entity: { domain: "number" } } },
       { name: "high_angle_entity", required: true, selector: { entity: { domain: "number" } } },
       { name: "span_entity", selector: { entity: { domain: "number" } } },
+      { name: "show_title", selector: { boolean: {} } },
+      { name: "show_state", selector: { boolean: {} } },
+      { name: "show_hint", selector: { boolean: {} } },
       { name: "show_presets", selector: { boolean: {} } },
       { name: "haptics", selector: { boolean: {} } },
+      { name: "animate_fan", selector: { boolean: {} } },
+      { name: "min_span", selector: { number: { min: 5, max: 175, step: 5, mode: "box", unit_of_measurement: "°" } } },
       { name: "features", selector: { select: { multiple: true, mode: "list", options: [
         { value: "power", label: "Aan/uit" },
         { value: "oscillation", label: "Oscillatie aan/uit" },

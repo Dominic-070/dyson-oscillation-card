@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-06-22
+
+### Fixed
+- Edge handles no longer hop across the rear dead-zone: dragging now uses a
+  relative model and pins cleanly at 0° / 350°.
+- Only a narrow band around the ring reacts to touch, so the empty corners and
+  centre can be used to scroll the dashboard on mobile.
+
+### Added
+- Separate switches to hide the title, the angle read-out and the instruction
+  text (`show_title`, `show_state`, `show_hint`).
+- Double-tap the centre angle to expand a collapsed (0°) width back to a minimum
+  (`min_span`, default 35°).
+- Draggable speed slider (press-and-drag, 10 levels).
+- Animated fan icon that spins with the speed (`animate_fan`, default on).
+
+### Changed
+- Control chips are narrower in a 4-column grid so four fit on a phone.
+
 ## [1.1.0] - 2026-06-21
 
 ### Added
@@ -40,5 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Optional preset row (45 / 90 / 180 / 350°).
 - Visual UI editor with entity pickers; HACS dashboard packaging.
 
+[1.3.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.3.0
 [1.1.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.0.0
