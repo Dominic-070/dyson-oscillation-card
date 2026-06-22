@@ -12,7 +12,7 @@
  * are dragged *relatively*, so they pin to 0°/350° and never hop across the gap.
  */
 
-const VERSION = "1.4.1";
+const VERSION = "1.4.2";
 
 /* ---------- geometry ---------------------------------------------------- */
 const VB = 400, CX = 200, CY = 200;
@@ -279,6 +279,9 @@ class DysonOscillationCard extends HTMLElement {
         .preset.sel { background:var(--acc); border-color:var(--acc); color:#fff; }
         .off { opacity:.45; }
         #hitlayer.off circle { pointer-events:none; }
+        /* idle: lets touches through; during a drag: full no-scroll capture surface */
+        #dragcatch { pointer-events:none; touch-action:none; }
+        #dragcatch.active { pointer-events:all; cursor:grabbing; }
         .controls { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px; }
         .chip { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
           padding:9px 3px; border-radius:14px; background:var(--chip-bg);
@@ -310,6 +313,7 @@ class DysonOscillationCard extends HTMLElement {
             <circle id="hit-high" r="48"/>
             <circle id="hit-center" r="54"/>
           </g>
+          <rect id="dragcatch" x="0" y="0" width="${VB}" height="${VB}" fill="transparent"/>
         </svg></div>
         <div class="hint"></div>
         <div class="presets"></div>
@@ -323,6 +327,7 @@ class DysonOscillationCard extends HTMLElement {
       high: this.shadowRoot.getElementById("hit-high"),
       center: this.shadowRoot.getElementById("hit-center"),
     };
+    this._dragCatch = this.shadowRoot.getElementById("dragcatch");
     this._headEl = this.shadowRoot.querySelector(".head");
     this._titleEl = this.shadowRoot.querySelector(".title");
     this._readoutEl = this.shadowRoot.querySelector(".readout");
@@ -330,13 +335,14 @@ class DysonOscillationCard extends HTMLElement {
     this._presetsEl = this.shadowRoot.querySelector(".presets");
     this._controlsEl = this.shadowRoot.querySelector(".controls");
     this._ctrlSig = "";
-    // Only the three handle zones grab; everything else lets the page scroll.
-    for (const el of Object.values(this._hitEls)) {
+    // Start a drag only on the three handle zones; everything else scrolls.
+    for (const el of Object.values(this._hitEls))
       el.addEventListener("pointerdown", (e) => this._onDown(e));
-      el.addEventListener("pointermove", (e) => this._onMove(e));
-      el.addEventListener("pointerup", (e) => this._onUp(e));
-      el.addEventListener("pointercancel", (e) => this._onUp(e));
-    }
+    // Once dragging, the full-area catch surface (touch-action:none) owns the
+    // pointer, so the drag keeps working off the ring without the page scrolling.
+    this._dragCatch.addEventListener("pointermove", (e) => this._onMove(e));
+    this._dragCatch.addEventListener("pointerup", (e) => this._onUp(e));
+    this._dragCatch.addEventListener("pointercancel", (e) => this._onUp(e));
   }
 
   /* ---- coordinate helpers ---- */
@@ -365,9 +371,10 @@ class DysonOscillationCard extends HTMLElement {
     }
     e.preventDefault();
     this._dragging = handle;
-    this._capEl = this._hitEls[handle];
-    // capture on the (persistent) grab zone so the drag survives off-ring and re-renders
-    try { this._capEl.setPointerCapture(e.pointerId); } catch (_) {}
+    // hand the pointer to the full-area catch surface so the drag survives
+    // leaving the small grab zone (the cause of scroll-instead-of-drag on mobile)
+    this._dragCatch.classList.add("active");
+    try { this._dragCatch.setPointerCapture(e.pointerId); } catch (_) {}
     this._dragPrevAngle = this._screenAngle(e.clientX, e.clientY);
     this._dragValue = handle === "low" ? this._low : handle === "high" ? this._high : this._center;
     this._hapticValue = this._dragValue;
@@ -399,8 +406,9 @@ class DysonOscillationCard extends HTMLElement {
 
   _onUp(e) {
     if (!this._dragging) return;
-    try { (this._capEl || this._hitEls[this._dragging]).releasePointerCapture(e.pointerId); } catch (_) {}
-    this._dragging = null; this._capEl = null;
+    try { this._dragCatch.releasePointerCapture(e.pointerId); } catch (_) {}
+    this._dragCatch.classList.remove("active");
+    this._dragging = null;
     if (this._config.haptics) haptic("light");
     this._flush(); this._render();
   }
