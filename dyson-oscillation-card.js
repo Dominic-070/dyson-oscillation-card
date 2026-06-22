@@ -11,7 +11,7 @@
  * are dragged *relatively*, so they pin to 0°/350° and never hop across the gap.
  */
 
-const VERSION = "1.3.0";
+const VERSION = "1.3.1";
 
 /* ---------- geometry ---------------------------------------------------- */
 const VB = 400, CX = 200, CY = 200;
@@ -240,6 +240,7 @@ class DysonOscillationCard extends HTMLElement {
     this._hintEl = this.shadowRoot.querySelector(".hint");
     this._presetsEl = this.shadowRoot.querySelector(".presets");
     this._controlsEl = this.shadowRoot.querySelector(".controls");
+    this._ctrlSig = "";                       // force controls to (re)build
     this._hitring.addEventListener("pointerdown", (e) => this._onDown(e));
     this._hitring.addEventListener("pointermove", (e) => this._onMove(e));
     this._hitring.addEventListener("pointerup", (e) => this._onUp(e));
@@ -433,69 +434,112 @@ class DysonOscillationCard extends HTMLElement {
       b.onclick = () => this._setPreset(parseInt(b.dataset.p, 10)));
   }
 
+  // The control row is built ONCE per layout and then updated in place. Rebuilding
+  // it on every state tick would recreate the <ha-icon> and restart its CSS spin
+  // (the cause of the stutter); keeping the element alive lets the animation run
+  // continuously, and the speed is changed via a CSS variable without a restart.
   _renderControls() {
-    const feats = this._config.features || [], hass = this._hass;
-    let html = "";
-    for (const key of feats) {
+    const hass = this._hass;
+    const visible = [];
+    for (const key of (this._config.features || [])) {
       const def = CONTROLS[key]; if (!def) continue;
-      const id = def.entity(this._map); const st = id && hass.states[id]; if (!st) continue;
-      if (def.kind === "toggle") {
-        const on = def.active(st);
-        html += `<div class="chip ${on ? "on" : ""}" data-key="${key}" data-id="${id}" role="button" tabindex="0">
-          <ha-icon icon="${def.icon}"></ha-icon><span class="clabel">${def.label}</span></div>`;
-      } else if (def.kind === "badge") {
-        html += `<div class="chip badge" data-key="${key}" data-id="${id}" role="button" tabindex="0">
-          <ha-icon icon="${def.icon}"></ha-icon><span class="cval">${def.text(st)}</span><span class="clabel">${def.label}</span></div>`;
-      } else if (def.kind === "slider") {
-        const pct = clamp(parseFloat(st.attributes.percentage) || 0, 0, 100), lvl = Math.round(pct / 10);
-        const spin = this._config.animate_fan !== false && st.state === "on" && pct > 0;
-        const dur = Math.max(0.4, 2.4 - (pct / 100) * 1.9).toFixed(2);
-        const iconStyle = spin ? `animation:dyson-spin ${dur}s linear infinite;` : "";
-        html += `<div class="slider" data-key="${key}" data-id="${id}">
-          <ha-icon icon="${def.icon}" style="${iconStyle}"></ha-icon>
-          <div class="track"><div class="fill" style="width:${pct}%"></div><div class="thumb" style="left:${pct}%"></div></div>
-          <span class="sval">${lvl}</span></div>`;
-      }
+      const id = def.entity(this._map); const st = id && hass.states[id];
+      if (st) visible.push({ key, def, id });
     }
-    this._controlsEl.innerHTML = html;
-
-    this._controlsEl.querySelectorAll(".chip").forEach((el) => {
-      const key = el.dataset.key, id = el.dataset.id, def = CONTROLS[key];
-      const fire = () => {
-        if (this._config.haptics) haptic("light");
-        if (def.kind === "badge") fireEvent(this, "hass-more-info", { entityId: id });
-        else def.tap(hass, id, hass.states[id]);
-      };
-      el.onclick = fire;
-      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fire(); } };
-    });
-    const slider = this._controlsEl.querySelector(".slider");
-    if (slider) this._wireSlider(slider);
+    const sig = visible.map((v) => v.key).join(",");
+    if (sig !== this._ctrlSig) { this._buildControls(visible); this._ctrlSig = sig; }
+    this._updateControls(visible);
   }
 
-  _wireSlider(slider) {
-    const id = slider.dataset.id;
-    const track = slider.querySelector(".track");
-    const fill = slider.querySelector(".fill");
-    const thumb = slider.querySelector(".thumb");
-    const sval = slider.querySelector(".sval");
-    const icon = slider.querySelector("ha-icon");
+  _buildControls(visible) {
+    this._controlsEl.innerHTML = "";
+    this._ctrlEls = {};
+    for (const { key, def, id } of visible) {
+      if (def.kind === "slider") {
+        const el = document.createElement("div");
+        el.className = "slider";
+        el.innerHTML = `<ha-icon icon="${def.icon}"></ha-icon>
+          <div class="track"><div class="fill"></div><div class="thumb"></div></div>
+          <span class="sval"></span>`;
+        this._controlsEl.appendChild(el);
+        const refs = {
+          kind: "slider", root: el, def, id, icon: el.querySelector("ha-icon"),
+          track: el.querySelector(".track"), fill: el.querySelector(".fill"),
+          thumb: el.querySelector(".thumb"), sval: el.querySelector(".sval"),
+          spinning: false, dur: null,
+        };
+        this._ctrlEls[key] = refs;
+        this._wireSlider(refs);
+      } else {
+        const el = document.createElement("div");
+        el.className = def.kind === "badge" ? "chip badge" : "chip";
+        el.setAttribute("role", "button"); el.tabIndex = 0;
+        el.innerHTML = def.kind === "badge"
+          ? `<ha-icon icon="${def.icon}"></ha-icon><span class="cval"></span><span class="clabel">${def.label}</span>`
+          : `<ha-icon icon="${def.icon}"></ha-icon><span class="clabel">${def.label}</span>`;
+        const fire = () => {
+          if (this._config.haptics) haptic("light");
+          if (def.kind === "badge") fireEvent(this, "hass-more-info", { entityId: id });
+          else def.tap(this._hass, id, this._hass.states[id]);
+        };
+        el.onclick = fire;
+        el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fire(); } };
+        this._controlsEl.appendChild(el);
+        this._ctrlEls[key] = { kind: def.kind, root: el, def, id, val: el.querySelector(".cval") };
+      }
+    }
+  }
+
+  _updateControls(visible) {
+    for (const { key, def, id } of visible) {
+      const refs = this._ctrlEls[key]; if (!refs) continue;
+      const st = this._hass.states[id]; if (!st) continue;
+      if (refs.kind === "toggle") {
+        refs.root.classList.toggle("on", def.active(st));
+      } else if (refs.kind === "badge") {
+        refs.val.textContent = def.text(st);
+      } else if (refs.kind === "slider" && !this._sliderDrag) {
+        const pct = clamp(parseFloat(st.attributes.percentage) || 0, 0, 100);
+        refs.fill.style.width = pct + "%";
+        refs.thumb.style.left = pct + "%";
+        refs.sval.textContent = Math.round(pct / 10);
+        this._applyFanSpin(refs, st.state === "on" ? pct : 0);
+      }
+    }
+  }
+
+  // Smooth spin: start the animation once, then only change --fan-dur so the
+  // browser retimes the running animation instead of restarting it.
+  _applyFanSpin(refs, pct) {
+    const spin = this._config.animate_fan !== false && pct > 0;
+    if (!spin) {
+      if (refs.spinning) { refs.icon.style.animation = ""; refs.spinning = false; refs.dur = null; }
+      return;
+    }
+    const dur = Math.max(0.4, 2.4 - (pct / 100) * 1.9).toFixed(2) + "s";
+    if (!refs.spinning) {
+      refs.icon.style.setProperty("--fan-dur", dur);
+      refs.icon.style.animation = "dyson-spin var(--fan-dur,2s) linear infinite";
+      refs.spinning = true; refs.dur = dur;
+    } else if (dur !== refs.dur) {
+      refs.icon.style.setProperty("--fan-dur", dur);
+      refs.dur = dur;
+    }
+  }
+
+  _wireSlider(refs) {
+    const { track, fill, thumb, sval, id } = refs;
     let lastPct = -1, sendTimer = null;
     const apply = (clientX) => {
       const r = track.getBoundingClientRect();
       let pct = clamp(((clientX - r.left) / r.width) * 100, 0, 100);
       pct = Math.round(pct / 10) * 10;                      // 10 Dyson levels
-      fill.style.width = pct + "%"; if (thumb) thumb.style.left = pct + "%";
+      fill.style.width = pct + "%"; thumb.style.left = pct + "%";
       sval.textContent = Math.round(pct / 10);
       if (pct !== lastPct) {
         lastPct = pct;
         if (this._config.haptics) haptic("selection", 30);
-        if (icon) {                                          // live-update the spin
-          if (this._config.animate_fan !== false && pct > 0) {
-            const dur = Math.max(0.4, 2.4 - (pct / 100) * 1.9).toFixed(2);
-            icon.style.animation = `dyson-spin ${dur}s linear infinite`;
-          } else icon.style.animation = "";
-        }
+        this._applyFanSpin(refs, pct);                       // smooth live update
         clearTimeout(sendTimer);
         sendTimer = setTimeout(() =>
           this._hass.callService("fan", "set_percentage", { entity_id: id, percentage: pct }), 120);

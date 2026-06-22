@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] - 2026-06-22
+
+### Fixed
+- Smooth fan-icon animation: the control row is built once and updated in place
+  instead of being recreated on every state tick, so the icon's CSS spin no
+  longer restarts. Speed changes adjust a `--fan-dur` CSS variable to retime the
+  running animation without a restart (as the Mushroom fan card does).
+
 ## [1.3.0] - 2026-06-22
 
 ### Fixed
@@ -59,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Optional preset row (45 / 90 / 180 / 350°).
 - Visual UI editor with entity pickers; HACS dashboard packaging.
 
+[1.3.1]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.3.1
 [1.3.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.3.0
 [1.1.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.0.0
