@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-06-22
+
+### Added
+- `width_follows_oscillation` (default on): turning oscillation off from the card
+  sets the width to 0°, and turning it on restores `min_span` (default 35°),
+  centred on the current direction.
+
 ## [1.4.3] - 2026-06-22
 
 ### Fixed
@@ -109,6 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Optional preset row (45 / 90 / 180 / 350°).
 - Visual UI editor with entity pickers; HACS dashboard packaging.
 
+[1.5.0]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.5.0
 [1.4.3]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.3
 [1.4.2]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.2
 [1.4.1]: https://github.com/Dominic-070/dyson-oscillation-card/releases/tag/v1.4.1

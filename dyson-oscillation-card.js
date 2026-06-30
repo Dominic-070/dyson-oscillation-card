@@ -12,7 +12,7 @@
  * are dragged *relatively*, so they pin to 0°/350° and never hop across the gap.
  */
 
-const VERSION = "1.4.3";
+const VERSION = "1.5.0";
 
 /* ---------- geometry ---------------------------------------------------- */
 const VB = 400, CX = 200, CY = 200;
@@ -36,7 +36,7 @@ const LANG = {
     e_show_title: "Show title", e_show_state: "Show angle read-out (direction/width)",
     e_show_hint: "Show instruction text", e_show_presets: "Show preset buttons",
     e_haptics: "Haptic feedback (phone)", e_animate: "Animate fan icon with speed",
-    e_minspan: "Min. width on double-tap (°)", e_fanicon: "Centre icon style",
+    e_minspan: "Min. width on double-tap (°)", e_widthosc: "Width follows oscillation on/off", e_fanicon: "Centre icon style",
     e_features: "Control buttons (Mushroom style)",
     o_power: "Power", o_oscillation: "Oscillation on/off", o_night: "Night mode", o_auto: "Auto mode",
     o_monitor: "Continuous monitoring", o_speed: "Speed (slider)", o_timer: "Sleep timer",
@@ -55,7 +55,7 @@ const LANG = {
     e_show_title: "Toon titel", e_show_state: "Toon hoek-waarden (richting/breedte)",
     e_show_hint: "Toon instructietekst", e_show_presets: "Toon preset-knoppen",
     e_haptics: "Haptische feedback (telefoon)", e_animate: "Animeer fan-icoon op snelheid",
-    e_minspan: "Min. breedte bij dubbeltik (°)", e_fanicon: "Stijl van het middenicoon",
+    e_minspan: "Min. breedte bij dubbeltik (°)", e_widthosc: "Breedte volgt oscillatie aan/uit", e_fanicon: "Stijl van het middenicoon",
     e_features: "Bedieningsknoppen (Mushroom-stijl)",
     o_power: "Aan/uit", o_oscillation: "Oscillatie aan/uit", o_night: "Nachtstand", o_auto: "Auto-modus",
     o_monitor: "Continue monitoring", o_speed: "Snelheid (slider)", o_timer: "Slaaptimer",
@@ -74,7 +74,7 @@ const LANG = {
     e_show_title: "Titel anzeigen", e_show_state: "Winkelanzeige zeigen (Richtung/Breite)",
     e_show_hint: "Hinweistext anzeigen", e_show_presets: "Preset-Tasten anzeigen",
     e_haptics: "Haptisches Feedback (Telefon)", e_animate: "Lüftersymbol mit Geschwindigkeit animieren",
-    e_minspan: "Min. Breite bei Doppeltipp (°)", e_fanicon: "Stil des Mittelsymbols",
+    e_minspan: "Min. Breite bei Doppeltipp (°)", e_widthosc: "Breite folgt Oszillation Ein/Aus", e_fanicon: "Stil des Mittelsymbols",
     e_features: "Bedientasten (Mushroom-Stil)",
     o_power: "Ein/Aus", o_oscillation: "Oszillation an/aus", o_night: "Nachtmodus", o_auto: "Auto-Modus",
     o_monitor: "Dauerüberwachung", o_speed: "Geschwindigkeit (Regler)", o_timer: "Sleep-Timer",
@@ -93,7 +93,7 @@ const LANG = {
     e_show_title: "Afficher le titre", e_show_state: "Afficher l'angle (direction/largeur)",
     e_show_hint: "Afficher le texte d'aide", e_show_presets: "Afficher les préréglages",
     e_haptics: "Retour haptique (téléphone)", e_animate: "Animer l'icône du ventilateur selon la vitesse",
-    e_minspan: "Largeur min. au double-tap (°)", e_fanicon: "Style de l'icône centrale",
+    e_minspan: "Largeur min. au double-tap (°)", e_widthosc: "La largeur suit l'oscillation", e_fanicon: "Style de l'icône centrale",
     e_features: "Boutons de commande (style Mushroom)",
     o_power: "Marche/Arrêt", o_oscillation: "Oscillation on/off", o_night: "Mode nuit", o_auto: "Mode auto",
     o_monitor: "Surveillance continue", o_speed: "Vitesse (curseur)", o_timer: "Minuterie",
@@ -112,7 +112,7 @@ const LANG = {
     e_show_title: "Mostrar título", e_show_state: "Mostrar ángulos (dirección/anchura)",
     e_show_hint: "Mostrar texto de ayuda", e_show_presets: "Mostrar botones de preajuste",
     e_haptics: "Respuesta háptica (teléfono)", e_animate: "Animar el icono del ventilador con la velocidad",
-    e_minspan: "Anchura mín. al doble toque (°)", e_fanicon: "Estilo del icono central",
+    e_minspan: "Anchura mín. al doble toque (°)", e_widthosc: "La anchura sigue la oscilación", e_fanicon: "Estilo del icono central",
     e_features: "Botones de control (estilo Mushroom)",
     o_power: "Encendido/Apagado", o_oscillation: "Oscilación on/off", o_night: "Modo noche", o_auto: "Modo auto",
     o_monitor: "Monitoreo continuo", o_speed: "Velocidad (deslizador)", o_timer: "Temporizador",
@@ -203,7 +203,7 @@ class DysonOscillationCard extends HTMLElement {
       throw new Error("Set center_angle_entity, low_angle_entity and high_angle_entity.");
     this._config = {
       show_presets: true, show_hint: true, show_title: true, show_state: true,
-      haptics: true, animate_fan: true, min_span: 35, fan_icon: "tower",
+      haptics: true, animate_fan: true, min_span: 35, fan_icon: "tower", width_follows_oscillation: true,
       presets: [45, 90, 180, 350], features: [...DEFAULT_FEATURES],
       ...config,
     };
@@ -427,13 +427,13 @@ class DysonOscillationCard extends HTMLElement {
     this._queue(this._config.center_angle_entity, c);
   }
 
-  _restoreSpan(deg) {
+  // Set the oscillation width to `deg`, centred on the current centre (0 = point).
+  _setWidth(deg) {
     const c = Math.round(this._center);
     let lo = clamp(c - Math.floor(deg / 2), 0, 350);
     let hi = clamp(lo + deg, 0, 350);
     if (hi - lo < deg) lo = clamp(hi - deg, 0, 350);
     this._low = lo; this._high = hi; this._center = (lo + hi) / 2;
-    if (this._config.haptics) haptic("medium");
     if (this._config.span_entity && this._hass.states[this._config.span_entity]) {
       this._hass.callService("number", "set_value", { entity_id: this._config.span_entity, value: hi - lo });
     } else {
@@ -441,6 +441,18 @@ class DysonOscillationCard extends HTMLElement {
       setTimeout(() => this._hass.callService("number", "set_value", { entity_id: this._config.low_angle_entity, value: lo }), 350);
     }
     this._render();
+  }
+
+  _restoreSpan(deg) {
+    if (this._config.haptics) haptic("medium");
+    this._setWidth(deg);
+  }
+
+  // Oscillation chip: toggle the fan AND drive the width — off → 0°, on → min_span.
+  _toggleOscillation(fanId, st) {
+    const turningOn = !(st && st.attributes && st.attributes.oscillating);
+    this._hass.callService("fan", "oscillate", { entity_id: fanId, oscillating: turningOn });
+    this._setWidth(turningOn ? (this._config.min_span || 35) : 0);
   }
 
   _queue(entity, value) {
@@ -575,6 +587,8 @@ class DysonOscillationCard extends HTMLElement {
         const fire = () => {
           if (this._config.haptics) haptic("light");
           if (def.kind === "badge") fireEvent(this, "hass-more-info", { entityId: id });
+          else if (key === "oscillation" && this._config.width_follows_oscillation !== false)
+            this._toggleOscillation(id, this._hass.states[id]);
           else def.tap(this._hass, id, this._hass.states[id]);
         };
         el.onclick = fire;
@@ -659,12 +673,13 @@ class DysonOscillationCardEditor extends HTMLElement {
       high_angle_entity: t("e_high"), span_entity: t("e_span"), show_title: t("e_show_title"),
       show_state: t("e_show_state"), show_hint: t("e_show_hint"), show_presets: t("e_show_presets"),
       haptics: t("e_haptics"), animate_fan: t("e_animate"), min_span: t("e_minspan"),
+      width_follows_oscillation: t("e_widthosc"),
       fan_icon: t("e_fanicon"), features: t("e_features"),
     }[s.name] || s.name);
     this._form.hass = this._hass;
     this._form.data = {
       show_title: true, show_state: true, show_hint: true, show_presets: true,
-      haptics: true, animate_fan: true, min_span: 35, fan_icon: "tower", features: DEFAULT_FEATURES, ...this._config,
+      haptics: true, animate_fan: true, min_span: 35, fan_icon: "tower", width_follows_oscillation: true, features: DEFAULT_FEATURES, ...this._config,
     };
     this._form.schema = [
       { name: "name", selector: { text: {} } },
@@ -681,6 +696,7 @@ class DysonOscillationCardEditor extends HTMLElement {
       { name: "haptics", selector: { boolean: {} } },
       { name: "animate_fan", selector: { boolean: {} } },
       { name: "min_span", selector: { number: { min: 5, max: 175, step: 5, mode: "box", unit_of_measurement: "°" } } },
+      { name: "width_follows_oscillation", selector: { boolean: {} } },
       { name: "features", selector: { select: { multiple: true, mode: "list", options: [
         { value: "power", label: t("o_power") }, { value: "oscillation", label: t("o_oscillation") },
         { value: "night_mode", label: t("o_night") }, { value: "auto", label: t("o_auto") },
